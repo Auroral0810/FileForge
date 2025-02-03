@@ -1,3 +1,6 @@
+import { RenameProcessor } from './renameRules'
+import type { ProcessForm, FileWithHandle } from '@/types/files'
+
 export const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -40,4 +43,53 @@ export const formatDate = (date: Date | number | string): string => {
   const seconds = String(d.getSeconds()).padStart(2, '0')
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+export const processRegexRename = (
+  fileName: string,
+  pattern: string,
+  replacement: string,
+  processExt: boolean
+): string => {
+  try {
+    // 默认使用全局替换
+    const regex = new RegExp(pattern, 'g')
+    
+    if (processExt) {
+      // 处理整个文件名（包括扩展名）
+      return fileName.replace(regex, replacement)
+    } else {
+      // 只处理文件名部分，保留扩展名
+      const ext = getFileExtension(fileName)
+      const nameWithoutExt = fileName.slice(0, -(ext.length + 1))
+      const newName = nameWithoutExt.replace(regex, replacement)
+      return `${newName}.${ext}`
+    }
+  } catch (error) {
+    console.error('正则表达式语法错误:', error)
+    return fileName // 如果正则表达式有错，返回原文件名
+  }
+}
+
+export const processFileName = (
+  file: FileWithHandle, 
+  rules: ProcessForm,
+  fileIndex: number
+): string => {
+  // 创建 RenameProcessor 实例
+  const processor = new RenameProcessor(rules)
+  
+  // 使用 RenameProcessor 处理文件名，传入文件索引
+  const newName = processor.processFileName(file.name, fileIndex)
+  
+  // 确保返回新的文件名
+  return newName
+}
+
+// 批量处理文件
+export const processFiles = (
+  files: FileWithHandle[],
+  rules: ProcessForm
+): string[] => {
+  return files.map((file, index) => processFileName(file, rules, index))
 }

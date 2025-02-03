@@ -25,11 +25,11 @@
                 <span>基础功能</span>
               </div>
             </template>
-            <el-menu-item index="/batch-rename">
+            <el-menu-item index="/batch-rename" @click="handleMenuClick('/batch-rename')">
               <el-icon><Document /></el-icon>
               <span>批量重命名</span>
             </el-menu-item>
-            <el-menu-item index="/file-preview">
+            <el-menu-item index="/file-preview" @click="handleMenuClick('/file-preview')">
               <el-icon><View /></el-icon>
               <span>文件预览</span>
             </el-menu-item>
@@ -47,15 +47,15 @@
                 <span>格式转换</span>
               </div>
             </template>
-            <el-menu-item index="/image-convert">
+            <el-menu-item index="/image-convert" @click="handleMenuClick('/image-convert')">
               <el-icon><Picture /></el-icon>
               <span>图片转换</span>
             </el-menu-item>
-            <el-menu-item index="/pdf-convert">
+            <el-menu-item index="/pdf-convert" @click="handleMenuClick('/pdf-convert')">
               <el-icon><Document /></el-icon>
               <span>PDF转换</span>
             </el-menu-item>
-            <el-menu-item index="/office-convert">
+            <el-menu-item index="/office-convert" @click="handleMenuClick('/office-convert')">
               <el-icon><Files /></el-icon>
               <span>Office转换</span>
             </el-menu-item>
@@ -73,15 +73,15 @@
                 <span>媒体处理</span>
               </div>
             </template>
-            <el-menu-item index="/image-compress">
+            <el-menu-item index="/image-compress" @click="handleMenuClick('/image-compress')">
               <el-icon><PictureFilled /></el-icon>
               <span>图片压缩</span>
             </el-menu-item>
-            <el-menu-item index="/video-gif">
+            <el-menu-item index="/video-gif" @click="handleMenuClick('/video-gif')">
               <el-icon><VideoPlay /></el-icon>
               <span>视频转GIF</span>
             </el-menu-item>
-            <el-menu-item index="/audio-convert">
+            <el-menu-item index="/audio-convert" @click="handleMenuClick('/audio-convert')">
               <el-icon><Headset /></el-icon>
               <span>音频转换</span>
             </el-menu-item>
@@ -99,21 +99,21 @@
                 <span>智能处理</span>
               </div>
             </template>
-            <el-menu-item index="/duplicate-check">
+            <el-menu-item index="/duplicate-check" @click="handleMenuClick('/duplicate-check')">
               <el-icon><CopyDocument /></el-icon>
               <span>重复文件检查</span>
             </el-menu-item>
-            <el-menu-item index="/content-detect">
+            <el-menu-item index="/content-detect" @click="handleMenuClick('/content-detect')">
               <el-icon><Warning /></el-icon>
               <span>内容检测</span>
             </el-menu-item>
-            <el-menu-item index="/exif-clean">
+            <el-menu-item index="/exif-clean" @click="handleMenuClick('/exif-clean')">
               <el-icon><Delete /></el-icon>
               <span>EXIF清理</span>
             </el-menu-item>
           </el-sub-menu>
 
-          <el-menu-item index="/about" class="menu-item animate__animated animate__fadeInLeft animate__delay-6s">
+          <el-menu-item index="/about" class="menu-item animate__animated animate__fadeInLeft animate__delay-6s" @click="handleMenuClick('/about')">
             <el-icon><InfoFilled /></el-icon>
             <span>关于我们</span>
           </el-menu-item>
@@ -134,8 +134,14 @@
             <transition 
               name="fade-transform" 
               mode="out-in"
+              @before-enter="handleBeforeEnter"
+              @after-leave="handleAfterLeave"
             >
-              <component :is="Component" />
+              <component 
+                :is="Component" 
+                :key="$route.fullPath"
+                class="animate__animated animate__fadeIn"
+              />
             </transition>
           </router-view>
         </el-main>
@@ -145,15 +151,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-// import { useRoute } from 'vue-router'
-import { 
-  Document, Picture, Film, Edit, View, Files,
-  PictureFilled, VideoPlay, Headset, Monitor,
-  CopyDocument, Warning, Delete, InfoFilled
-} from '@element-plus/icons-vue'
+import { ref, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 
-// const route = useRoute()
+const router = useRouter()
 const activeSubmenu = ref('')
 let leaveTimer: ReturnType<typeof setTimeout>
 
@@ -170,6 +171,25 @@ const handleSubmenuLeave = () => {
 
 const handleMenuLeave = () => {
   activeSubmenu.value = ''
+}
+
+const handleBeforeEnter = () => {
+  nextTick(() => {
+    document.documentElement.scrollTop = 0
+  })
+}
+
+const handleAfterLeave = () => {
+  const elements = document.querySelectorAll('.animate__animated')
+  elements.forEach(el => {
+    el.classList.remove('animate__fadeIn', 'animate__delay-1s')
+  })
+}
+
+const handleMenuClick = async (path: string) => {
+  handleAfterLeave()
+  await nextTick()
+  router.push(path)
 }
 </script>
 
@@ -210,7 +230,7 @@ const handleMenuLeave = () => {
 .menu-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0px;
 }
 
 :deep(.el-menu-item),
@@ -256,7 +276,9 @@ const handleMenuLeave = () => {
 }
 
 .el-main {
-  padding: 0px;
+  position: relative;
+  overflow-x: hidden;
+  padding: 20px;
 }
 
 .main-container {
@@ -278,7 +300,7 @@ const handleMenuLeave = () => {
 
 .fade-transform-enter-active,
 .fade-transform-leave-active {
-  transition: all 0.5s;
+  transition: all 0.3s ease-out;
 }
 
 .fade-transform-enter-from {

@@ -1,9 +1,11 @@
 <template>
   <div class="batch-rename">
-    <el-card>
+    <el-card class="batch-rename-card">
       <template #header>
         <div class="card-header">
-          <span>批量重命名 (共 {{ fileList.length }} 个文件)</span>
+          <span>共 {{ fileCount }} 个文件</span>
+          <div class="header-actions">
+          </div>
         </div>
       </template>
 
@@ -14,11 +16,13 @@
             <el-option label="排除文件" value="exclude" />
           </el-select>
 
-          <el-select v-model="filterForm.field" class="filter-item" placeholder="文件名">
-            <el-option label="文件名" value="filename" />
-            <el-option label="后缀名" value="extension" label-zh="后缀名" />
-            <el-option label="修改时间" value="lastModified" />
-            <el-option label="文件大小" value="size" />
+          <el-select v-model="filterForm.field" class="filter-item">
+            <el-option
+              v-for="field in filterFields"
+              :key="field.value"
+              :label="field.label"
+              :value="field.value"
+            />
           </el-select>
 
           <template v-if="filterForm.field === 'lastModified'">
@@ -89,31 +93,30 @@
             忽略大小写
           </el-checkbox>
 
-          <el-button type="primary" @click="handleFilter">提交</el-button>
+          <el-button type="primary" @click="addFilter">提交</el-button>
           <el-button type="warning" @click="clearFilters" :disabled="!activeFilters.length">
             <el-icon><delete /></el-icon>
             清除过滤
           </el-button>
 
           <el-tooltip 
-            :content="filterForm.field === 'filename' ? '这里的文件名不包括扩展名' : filterForm.field === 'extension' ? '后缀名称支持模糊处理' : ''" 
+            :content="filterForm.field === 'name' ? '这里的文件名不包括扩展名' : filterForm.field === 'path' ? '后缀名称支持模糊处理' : ''" 
             placement="top"
-            v-if="filterForm.field === 'filename' || filterForm.field === 'extension'"
+            v-if="filterForm.field === 'name' || filterForm.field === 'path'"
           >
             <el-icon class="help-icon"><question-filled /></el-icon>
           </el-tooltip>
         </div>
 
-        <div class="filter-tags" v-if="activeFilters.length">
+        <div class="filter-tags">
           <el-tag
             v-for="(filter, index) in activeFilters"
             :key="index"
-            class="filter-tag"
             closable
+            class="filter-tag"
             @close="removeFilter(index)"
           >
-            [{{ filter.type === 'include' ? '包含文件' : '排除文件' }}] 
-            {{ getFilterDescription(filter) }}
+            {{ getFilterLabel(filter) }}
           </el-tag>
         </div>
       </div>
@@ -222,74 +225,71 @@
                 <el-checkbox v-model="processForm.insert.enabled">启用规则</el-checkbox>
                 <el-checkbox v-model="processForm.insert.processExt" class="ml-4">同时处理后缀名</el-checkbox>
               </el-form-item>
+              
+              <el-form-item label="插入类型">
+                <el-radio-group v-model="processForm.insert.type">
+                  <el-radio-button label="text">文本</el-radio-button>
+                  <el-radio-button label="sequence">序号</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+
               <el-form-item label="插入位置">
                 <el-select v-model="processForm.insert.position">
-                  <el-option label="文件名开头" value="start" />
-                  <el-option label="文件名结尾" value="end" />
-                  <el-option label="指定位置" value="custom" />
-                </el-select>
-                <el-input-number 
-                  v-if="processForm.insert.position === 'custom'"
-                  v-model="processForm.insert.customPosition"
-                  :min="1"
-                  class="ml-2"
-                />
-              </el-form-item>
-              <el-form-item label="插入内容">
-                <el-input v-model="processForm.insert.text" placeholder="请输入要插入的内容" />
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane name="delete">
-            <template #label>
-              <span class="tab-label">
-                删除字符
-                <span v-if="processForm.delete.enabled" class="active-dot"></span>
-              </span>
-            </template>
-            <el-form :model="processForm.delete" label-width="120px">
-              <el-form-item>
-                <el-checkbox v-model="processForm.delete.enabled">启用规则</el-checkbox>
-                <el-checkbox v-model="processForm.delete.processExt" class="ml-4">同时处理后缀名</el-checkbox>
-              </el-form-item>
-              <el-form-item label="删除位置">
-                <el-select v-model="processForm.delete.type">
-                  <el-option label="删除前N个字符" value="start" />
-                  <el-option label="删除后N个字符" value="end" />
-                  <el-option label="删除指定位置" value="custom" />
+                  <el-option label="开始位置" value="start" />
+                  <el-option label="末尾位置" value="end" />
+                  <el-option label="第N个字符之后" value="afterN" />
+                  <el-option label="倒数N个字符之前" value="beforeN" />
+                  <el-option label="XX字符串之后" value="afterString" />
+                  <el-option label="XX字符串之前" value="beforeString" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="删除数量">
-                <el-input-number v-model="processForm.delete.count" :min="1" />
-              </el-form-item>
-              <el-form-item v-if="processForm.delete.type === 'custom'" label="起始位置">
-                <el-input-number v-model="processForm.delete.startPos" :min="1" />
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
 
-          <el-tab-pane name="pad">
-            <template #label>
-              <span class="tab-label">
-                补齐字符
-                <span v-if="processForm.pad.enabled" class="active-dot"></span>
-              </span>
-            </template>
-            <el-form :model="processForm.pad" label-width="120px">
-              <el-form-item>
-                <el-checkbox v-model="processForm.pad.enabled">启用规则</el-checkbox>
-                <el-checkbox v-model="processForm.pad.processExt" class="ml-4">同时处理后缀名</el-checkbox>
-              </el-form-item>
-              <el-form-item label="对第">
-                <el-input-number v-model="processForm.pad.startPos" :min="1" />
-                <span class="ml-2">组数字进行补零操作，目标长度为：</span>
-                <el-input-number v-model="processForm.pad.targetLength" :min="1" class="ml-2" />
-              </el-form-item>
-              <el-form-item label="填充字符">
-                <el-input v-model="processForm.pad.fillChar" maxlength="1" style="width: 80px" />
-                <span class="form-tip ml-2">1 / 1</span>
-              </el-form-item>
+              <template v-if="processForm.insert.position === 'afterN' || processForm.insert.position === 'beforeN'">
+                <el-form-item label="字符位置">
+                  <el-input-number v-model="processForm.insert.charPosition" :min="1" />
+                </el-form-item>
+              </template>
+
+              <template v-if="processForm.insert.position === 'afterString' || processForm.insert.position === 'beforeString'">
+                <el-form-item label="查找字符串">
+                  <el-input v-model="processForm.insert.searchString" placeholder="请输入要查找的字符串" />
+                </el-form-item>
+              </template>
+
+              <template v-if="processForm.insert.type === 'text'">
+                <el-form-item label="插入内容">
+                  <el-input v-model="processForm.insert.text" placeholder="请输入要插入的内容" />
+                </el-form-item>
+              </template>
+
+              <template v-else>
+                <el-form-item label="序号类型">
+                  <el-select v-model="processForm.insert.sequenceType">
+                    <el-option label="阿拉伯数字" value="arabic" />
+                    <el-option label="小写中文数字" value="chineseSmall" />
+                    <el-option label="大写中文数字" value="chineseBig" />
+                    <el-option label="英文小写字母" value="englishLower" />
+                    <el-option label="英文大写字母" value="englishUpper" />
+                    <el-option label="罗马数字" value="roman" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item label="起始序号">
+                  <el-input-number v-model="processForm.insert.startNumber" :min="0" />
+                </el-form-item>
+
+                <el-form-item label="固定位数">
+                  <el-input-number v-model="processForm.insert.digits" :min="1" />
+                </el-form-item>
+
+                <el-form-item label="序号前缀">
+                  <el-input v-model="processForm.insert.prefix" placeholder="序号前的文本" />
+                </el-form-item>
+
+                <el-form-item label="序号后缀">
+                  <el-input v-model="processForm.insert.suffix" placeholder="序号后的文本" />
+                </el-form-item>
+              </template>
             </el-form>
           </el-tab-pane>
 
@@ -305,23 +305,30 @@
                 <el-checkbox v-model="processForm.sequence.enabled">启用规则</el-checkbox>
                 <el-checkbox v-model="processForm.sequence.processExt" class="ml-4">同时处理后缀名</el-checkbox>
               </el-form-item>
-              <el-form-item label="起始序号">
-                <el-input-number v-model="processForm.sequence.startNumber" :min="0" />
+              
+              <el-form-item label="对第">
+                <el-input-number 
+                  v-model="processForm.sequence.groupIndex" 
+                  :min="1" 
+                  :default-value="1"
+                />
+                <span class="ml-2">组数字进行补齐，目标长度为：</span>
+                <el-input-number 
+                  v-model="processForm.sequence.targetLength" 
+                  :min="1" 
+                  :default-value="2"
+                  class="ml-2"
+                />
               </el-form-item>
-              <el-form-item label="递增值">
-                <el-input-number v-model="processForm.sequence.increment" :min="1" />
-              </el-form-item>
-              <el-form-item label="序号位数">
-                <el-input-number v-model="processForm.sequence.digits" :min="1" />
-              </el-form-item>
-              <el-form-item label="序号位置">
-                <el-radio-group v-model="processForm.sequence.position">
-                  <el-radio label="prefix">前缀</el-radio>
-                  <el-radio label="suffix">后缀</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item label="分隔符">
-                <el-input v-model="processForm.sequence.separator" style="width: 80px" />
+              
+              <el-form-item label="填充字符">
+                <el-input 
+                  v-model="processForm.sequence.fillChar" 
+                  maxlength="1" 
+                  style="width: 80px"
+                  placeholder="默认为0"
+                />
+                <span class="form-tip ml-2">1 / 1</span>
               </el-form-item>
             </el-form>
           </el-tab-pane>
@@ -341,17 +348,20 @@
               <el-form-item label="命名模板">
                 <el-input 
                   v-model="processForm.newName.template" 
-                  placeholder="支持变量：{n}序号 {name}原名 {ext}扩展名"
-                />
-              </el-form-item>
-              <el-form-item label="起始序号">
-                <el-input-number v-model="processForm.newName.startNumber" :min="0" />
-              </el-form-item>
-              <el-form-item label="递增值">
-                <el-input-number v-model="processForm.newName.increment" :min="1" />
-              </el-form-item>
-              <el-form-item label="序号位数">
-                <el-input-number v-model="processForm.newName.digits" :min="1" />
+                  placeholder="输入命名模板，例如：<name>_<date.now:YYYY-MM-DD>_<###>"
+                >
+                  <template #append>
+                    <el-tooltip
+                      content="点击查看变量说明"
+                      placement="top"
+                    >
+                      <el-button
+                        :icon="QuestionFilled"
+                        @click="helpVisible = true"
+                      />
+                    </el-tooltip>
+                  </template>
+                </el-input>
               </el-form-item>
             </el-form>
           </el-tab-pane>
@@ -365,18 +375,22 @@
             </template>
             <el-form :model="processForm.regex" label-width="120px">
               <el-form-item>
-                <el-checkbox v-model="processForm.regex.enabled">启用规则</el-checkbox>
-                <el-checkbox v-model="processForm.regex.processExt" class="ml-4">同时处理后缀名</el-checkbox>
+                <div class="regex-header">
+                  <div class="regex-checkboxes">
+                    <el-checkbox v-model="processForm.regex.enabled">启用规则</el-checkbox>
+                    <el-checkbox v-model="processForm.regex.processExt" class="ml-4">同时处理后缀名</el-checkbox>
+                  </div>
+                  <el-button type="primary" link @click="showRegexHelp">
+                    <el-icon><QuestionFilled /></el-icon>
+                    正则表达式帮助
+                  </el-button>
+                </div>
               </el-form-item>
               <el-form-item label="正则表达式">
                 <el-input v-model="processForm.regex.pattern" placeholder="请输入正则表达式" />
               </el-form-item>
               <el-form-item label="替换内容">
                 <el-input v-model="processForm.regex.replacement" placeholder="支持$1,$2等捕获组引用" />
-              </el-form-item>
-              <el-form-item>
-                <el-checkbox v-model="processForm.regex.useGlobal">全局替换</el-checkbox>
-                <el-checkbox v-model="processForm.regex.ignoreCase">忽略大小写</el-checkbox>
               </el-form-item>
             </el-form>
           </el-tab-pane>
@@ -439,11 +453,15 @@
       </div>
 
       <div class="view-options mt-4">
-        <el-radio-group v-model="previewMode">
-          <el-radio-button label="list">显示目录</el-radio-button>
-          <el-radio-button label="preview">仅显示预览</el-radio-button>
-          <el-radio-button label="affected">仅显示受影响文件</el-radio-button>
-        </el-radio-group>
+        <div class="view-controls">
+          <el-radio-group v-model="previewMode">
+            <el-radio-button label="preview">仅显示预览</el-radio-button>
+            <el-radio-button label="affected">仅显示受影响文件</el-radio-button>
+          </el-radio-group>
+          <el-checkbox v-model="showPath" class="show-path-checkbox">
+            显示目录
+          </el-checkbox>
+        </div>
         <div class="selection-actions">
           <el-button 
             type="danger" 
@@ -458,204 +476,361 @@
 
       <div class="file-list-container mt-4">
         <el-table 
-          :data="filteredFileList" 
+          :data="tableData"
           height="400"
           style="width: 100%"
+          :row-class-name="getRowClassName"
           @selection-change="handleSelectionChange"
+          :stripe="false"
         >
           <el-table-column type="selection" width="55" />
-          <el-table-column type="index" label="序号" width="60" />
-          <el-table-column prop="name" label="文件名" sortable />
-          <template v-if="previewMode === 'list'">
-            <el-table-column prop="path" label="目录" sortable />
-            <el-table-column prop="newName" label="预览" sortable />
-            <el-table-column prop="lastModified" label="修改时间" sortable>
-              <template #default="{ row }">
-                {{ formatDate(row.lastModified) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="size" label="大小" sortable>
-              <template #default="{ row }">
-                {{ formatFileSize(row.size) }}
-              </template>
-            </el-table-column>
-          </template>
-          <template v-else-if="previewMode === 'preview'">
-            <el-table-column prop="newName" label="预览" sortable />
-            <el-table-column prop="size" label="大小" sortable>
-              <template #default="{ row }">
-                {{ formatFileSize(row.size) }}
-              </template>
-            </el-table-column>
-          </template>
-          <template v-else>
-            <el-table-column prop="newName" label="预览" sortable />
-            <el-table-column prop="lastModified" label="修改时间" sortable>
-              <template #default="{ row }">
-                {{ formatDate(row.lastModified) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="size" label="大小" sortable>
-              <template #default="{ row }">
-                {{ formatFileSize(row.size) }}
-              </template>
-            </el-table-column>
-          </template>
+          <el-table-column prop="name" label="原文件名" min-width="200" />
+          <el-table-column prop="newName" label="新文件名" min-width="200" />
+          <el-table-column prop="size" label="大小" width="120">
+            <template #default="{ row }">
+              {{ formatFileSize(row.size) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="lastModified" label="修改时间" width="180">
+            <template #default="{ row }">
+              {{ formatDate(row.lastModified) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="path" label="路径" min-width="200" v-if="showPath" />
         </el-table>
       </div>
 
-      <div class="actions mt-4">
-        <div class="action-buttons">
-          <el-button 
-            type="primary" 
-            class="action-button execute-btn"
-            size="large"
-            :icon="Check"
-            @click="handleExecute"
-          >
-            执行
-          </el-button>
-          <el-button 
-            class="action-button clear-btn"
-            size="large"
-            :icon="Delete"
-            @click="handleClear"
-          >
-            清空
-          </el-button>
-          <el-button 
-            class="action-button refresh-btn"
-            size="large"
-            :icon="Refresh"
+      <div class="operation-buttons">
+        <el-button-group>
+          <el-button
+            type="primary"
+            :icon="RefreshRight"
             @click="handleRefresh"
+            :disabled="isProcessingSelected"
           >
             刷新
           </el-button>
-        </div>
+          <el-button
+            type="primary"
+            :icon="Delete"
+            @click="handleClear"
+            :disabled="!hasFiles"
+          >
+            清空
+          </el-button>
+        </el-button-group>
+
+        <el-button-group class="history-buttons">
+          <el-button
+            :icon="Back"
+            @click="handleUndo"
+            :disabled="!historyStore.undoStack?.length"
+          >
+            撤销
+          </el-button>
+          <el-button
+            :icon="Right"
+            @click="handleRedo"
+            :disabled="!historyStore.redoStack?.length"
+          >
+            重做
+          </el-button>
+        </el-button-group>
+
+        <el-button
+          type="success"
+          :icon="Check"
+          @click="handleExecute"
+          :disabled="!hasFilteredFiles || isProcessingSelected"
+        >
+          执行
+        </el-button>
       </div>
     </el-card>
   </div>
+
+  <el-dialog
+    v-model="helpVisible"
+    width="800px"
+    :close-on-click-modal="true"
+    :show-close="true"
+    class="variable-help-dialog"
+  >
+    <div class="variable-help">
+      <el-carousel 
+        height="600px"
+        indicator-position="outside" 
+        :autoplay="false"
+        trigger="click"
+      >
+        <!-- 第一页：变量说明 -->
+        <el-carousel-item>
+          <div class="help-page">
+            <h4 class="page-title">🔍 可用变量说明</h4>
+            <div class="vars-list">
+              <!-- 基础变量 -->
+              <div class="var-item">
+                <code class="code-primary">&lt;name&gt;</code>
+                <span class="var-desc">原文件名(不含后缀)</span>
+              </div>
+              <div class="var-item">
+                <code class="code-primary">&lt;ext&gt;</code>
+                <span class="var-desc">原后缀名</span>
+              </div>
+              <div class="var-item">
+                <code class="code-primary">&lt;name:upper&gt;</code> / <code class="code-primary">&lt;name:lower&gt;</code>
+                <span class="var-desc">转换大小写</span>
+              </div>
+
+              <!-- 编号变量 -->
+              <div class="var-item">
+                <code class="code-success">&lt;#&gt;</code>
+                <span class="var-desc">编号，从1开始</span>
+              </div>
+              <div class="var-item">
+                <code class="code-success">&lt;####&gt;</code>
+                <span class="var-desc">固定位数编号，如0001</span>
+              </div>
+
+              <!-- 日期时间 -->
+              <div class="var-item">
+                <code class="code-warning">&lt;date&gt;</code> / <code class="code-warning">&lt;date.now&gt;</code>
+                <span class="var-desc">当前日期</span>
+              </div>
+              <div class="var-item">
+                <code class="code-warning">&lt;date.modify&gt;</code>
+                <span class="var-desc">文件修改日期</span>
+              </div>
+              <div class="var-item">
+                <code class="code-info">&lt;time&gt;</code> / <code class="code-info">&lt;time.now&gt;</code>
+                <span class="var-desc">当前时间</span>
+              </div>
+              <div class="var-item">
+                <code class="code-info">&lt;time.modify&gt;</code>
+                <span class="var-desc">文件修改时间</span>
+              </div>
+
+              <!-- 特殊变量 -->
+              <div class="var-item">
+                <code class="code-danger">&lt;uuid:8:upper&gt;</code>
+                <span class="var-desc">随机字符串，:8指定长度(最长32)，:upper转换大写</span>
+              </div>
+
+              <div class="format-note">
+                格式化示例：<code class="code-example">&lt;date:YYYY-MM-DD&gt;</code> <code class="code-example">&lt;time:HH-mm-ss&gt;</code>
+              </div>
+            </div>
+          </div>
+        </el-carousel-item>
+
+        <!-- 第二页：基础示例 -->
+        <el-carousel-item>
+          <div class="help-page">
+            <h4 class="help-title">📝 基础示例</h4>
+            <div class="example-content">
+              <div class="example-group">
+                <div class="example-title">📸 照片日期编号</div>
+                <div class="example-code">
+                  <div class="code-label">模板：</div>
+                  <code class="code-block">照片_&lt;date.now:YYYY-MM-DD&gt;_&lt;###&gt;</code>
+                </div>
+                <div class="example-result">
+                  <div class="result-label">结果：</div>
+                  <div class="result-text">照片_2024-01-20_001.jpg</div>
+                </div>
+                <div class="example-desc">适用于按日期整理照片，自动编号</div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="example-group">
+                <div class="example-title">📊 报表命名规范</div>
+                <div class="example-code">
+                  <div class="code-label">模板：</div>
+                  <code class="code-block">月度报表_&lt;name:upper&gt;_&lt;date.now:YYYYMM&gt;</code>
+                </div>
+                <div class="example-result">
+                  <div class="result-label">结果：</div>
+                  <div class="result-text">月度报表_SALES_202401.xlsx</div>
+                </div>
+                <div class="example-desc">适用于规范化报表命名，自动大写</div>
+              </div>
+            </div>
+          </div>
+        </el-carousel-item>
+
+        <!-- 第三页：进阶示例 -->
+        <el-carousel-item>
+          <div class="help-page">
+            <h4 class="help-title">🚀 进阶示例</h4>
+            <div class="example-content">
+              <div class="example-group">
+                <div class="example-title">🎵 音乐文件整理</div>
+                <div class="example-code">
+                  <div class="code-label">模板：</div>
+                  <code class="code-block">&lt;name:upper&gt;_&lt;date.modify:YYYY-MM&gt;_&lt;uuid:6:upper&gt;</code>
+                </div>
+                <div class="example-result">
+                  <div class="result-label">结果：</div>
+                  <div class="result-text">SONG_2024-01_A7B2C3.mp3</div>
+                </div>
+                <div class="example-desc">使用修改日期和唯一标识符整理音乐文件</div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="example-group">
+                <div class="example-title">📱 截图归档</div>
+                <div class="example-code">
+                  <div class="code-label">模板：</div>
+                  <code class="code-block">Screenshot_&lt;time.now:HHmmss&gt;_&lt;uuid:4&gt;</code>
+                </div>
+                <div class="example-result">
+                  <div class="result-label">结果：</div>
+                  <div class="result-text">Screenshot_153022_x4f2.png</div>
+                </div>
+                <div class="example-desc">使用精确时间和短UUID区分截图</div>
+              </div>
+            </div>
+          </div>
+        </el-carousel-item>
+
+        <!-- 第四页：完整示例 -->
+        <el-carousel-item>
+          <div class="help-page">
+            <h4 class="help-title">🎯 完整示例</h4>
+            <div class="example-content">
+              <div class="example-group">
+                <div class="example-title">📁 项目文档管理</div>
+                <div class="example-code">
+                  <div class="code-label">模板：</div>
+                  <code class="code-block">项目文档/&lt;date.now:YYYY&gt;/&lt;date.now:MM&gt;/DOC_&lt;time.now:HH-mm&gt;_&lt;####&gt;</code>
+                </div>
+                <div class="example-result">
+                  <div class="result-label">结果：</div>
+                  <div class="result-text">项目文档/2024/01/DOC_15-30_0001.pdf</div>
+                </div>
+                <div class="example-desc">自动创建年月目录结构，规范化文档命名</div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="example-group">
+                <div class="example-title">🎨 设计稿版本控制</div>
+                <div class="example-code">
+                  <div class="code-label">模板：</div>
+                  <code class="code-block">&lt;name&gt;/v&lt;##&gt;/&lt;name:lower&gt;_&lt;date.now:YYYYMMDDHHmm&gt;</code>
+                </div>
+                <div class="example-result">
+                  <div class="result-label">结果：</div>
+                  <div class="result-text">Homepage/v01/homepage_202401201530.psd</div>
+                </div>
+                <div class="example-desc">按版本号组织设计稿，包含详细时间戳</div>
+              </div>
+            </div>
+          </div>
+        </el-carousel-item>
+      </el-carousel>
+    </div>
+  </el-dialog>
+
+  <!-- 正则表达式帮助对话框 -->
+  <el-dialog
+    v-model="regexHelpVisible"
+    title="正则表达式使用帮助"
+    width="800px"
+    :close-on-click-modal="true"
+  >
+    <el-carousel height="400px" :interval="4000" indicator-position="outside">
+      <!-- 示例1：基础替换 -->
+      <el-carousel-item>
+        <div class="help-slide">
+          <h3>基础替换示例</h3>
+          <div class="example-box">
+            <div class="example-item">
+              <div class="code-block">
+                <p>原文件名：report2024.pdf</p>
+                <p>正则表达式：report(\d+)</p>
+                <p>替换内容：文档_$1</p>
+              </div>
+              <div class="result-block">
+                <el-icon><ArrowDown /></el-icon>
+                <p>结果：文档_2024.pdf</p>
+              </div>
+            </div>
+            <div class="example-desc">
+              说明：将"report"替换为"文档_"，并保留后面的数字
+            </div>
+          </div>
+        </div>
+      </el-carousel-item>
+
+      <!-- 示例2：日期格式转换 -->
+      <el-carousel-item>
+        <div class="help-slide">
+          <h3>日期格式转换示例</h3>
+          <div class="example-box">
+            <div class="example-item">
+              <div class="code-block">
+                <p>原文件名：2024-01-20.jpg</p>
+                <p>正则表达式：(\d{4})-(\d{2})-(\d{2})</p>
+                <p>替换内容：$1年$2月$3日</p>
+              </div>
+              <div class="result-block">
+                <el-icon><ArrowDown /></el-icon>
+                <p>结果：2024年01月20日.jpg</p>
+              </div>
+            </div>
+            <div class="example-desc">
+              说明：将短横线日期格式转换为中文日期格式
+            </div>
+          </div>
+        </div>
+      </el-carousel-item>
+
+      <!-- 示例3：序号提取 -->
+      <el-carousel-item>
+        <div class="help-slide">
+          <h3>序号提取示例</h3>
+          <div class="example-box">
+            <div class="example-item">
+              <div class="code-block">
+                <p>原文件名：IMG_20240120_001.jpg</p>
+                <p>正则表达式：IMG_\d+_(\d+)</p>
+                <p>替换内容：图片_$1</p>
+              </div>
+              <div class="result-block">
+                <el-icon><ArrowDown /></el-icon>
+                <p>结果：图片_001.jpg</p>
+              </div>
+            </div>
+            <div class="example-desc">
+              说明：提取文件名中的序号部分
+            </div>
+          </div>
+        </div>
+      </el-carousel-item>
+    </el-carousel>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useFileStore } from '@/store/files'
-import { formatFileSize, formatDate } from '@/utils/file'
-import { UploadFilled, QuestionFilled } from '@element-plus/icons-vue'
+import { ref, computed, watch, nextTick } from 'vue'
+import { useFileStore } from '@/store/fileStore'
+import { useHistoryStore } from '@/stores/historyStore'
+import type { FileWithHandle, ProcessedFile, FilterCondition, ProcessForm } from '@/types/files'
+import { RenameProcessor, type ProcessForm as RenameProcessForm } from '@/utils/renameRules'
+import { formatFileSize, formatDate, processRegexRename } from '@/utils/file'
+import { UploadFilled, QuestionFilled, RefreshRight, Delete, Back, Right, Check, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { Check, Delete, Refresh } from '@element-plus/icons-vue'
-import { RenameProcessor } from '@/utils/renameRules'
-
-interface FileWithHandle {
-  name: string;
-  size: number;
-  type: string;
-  lastModified: number;
-  handle?: FileSystemFileHandle;
-  path: string;
-  arrayBuffer: () => Promise<ArrayBuffer>;
-  slice: (start?: number, end?: number) => Blob;
-  stream: () => ReadableStream;
-  text: () => Promise<string>;
-}
-
-interface FilterCondition {
-  type: string
-  field: string
-  condition: string
-  value: string | number
-  ignoreCase?: boolean
-  startDate?: string
-  endDate?: string
-  sizeValue?: number
-  sizeUnit?: string
-}
 
 const fileStore = useFileStore()
+const historyStore = useHistoryStore()
+const filteredFileList = ref<ProcessedFile[]>([])
+const activeFilters = ref<FilterCondition[]>([])
+const previewMode = ref('preview')
 const selectedFiles = ref<FileWithHandle[]>([])
 const isProcessingSelected = ref(false)
-
-const activeProcessTab = ref('replace')
-const previewMode = ref('list')
-
-const filterForm = ref({
-  type: 'include',
-  field: 'filename',
-  condition: 'contains',
-  value: '',
-  ignoreCase: true,
-  startDate: '',
-  endDate: '',
-  sizeValue: 0,
-  sizeUnit: 'MB'
-})
-
-interface ReplaceRule {
-  enabled: boolean
-  processExt: boolean
-  ignoreCase: boolean
-  type: 'specific' | 'frontN' | 'backN' | 'positionMN' | 'reversePositionMN' | 
-        'afterString' | 'beforeString' | 'afterStringN' | 'beforeStringN'
-  searchText: string
-  replaceText: string
-  count: number
-  position: number
-}
-
-interface ProcessForm {
-  replace: ReplaceRule
-  insert: {
-    enabled: boolean
-    processExt: boolean
-    position: 'start' | 'end' | 'custom'
-    customPosition: number
-    text: string
-  }
-  delete: {
-    enabled: boolean
-    processExt: boolean
-    type: 'start' | 'end' | 'custom'
-    count: number
-    startPos: number
-  }
-  pad: {
-    enabled: boolean
-    processExt: boolean
-    startPos: number
-    targetLength: number
-    fillChar: string
-  }
-  sequence: {
-    enabled: boolean
-    processExt: boolean
-    startNumber: number
-    increment: number
-    digits: number
-    position: 'prefix' | 'suffix'
-    separator: string
-  }
-  newName: {
-    enabled: boolean
-    processExt: boolean
-    template: string
-    startNumber: number
-    increment: number
-    digits: number
-  }
-  regex: {
-    enabled: boolean
-    processExt: boolean
-    pattern: string
-    replacement: string
-    useGlobal: boolean
-    ignoreCase: boolean
-  }
-  customJS: {
-    enabled: boolean
-    processExt: boolean
-    code: string
-  }
-}
 
 const processForm = ref<ProcessForm>({
   replace: {
@@ -671,40 +846,28 @@ const processForm = ref<ProcessForm>({
   insert: {
     enabled: false,
     processExt: false,
+    type: 'text',
     position: 'start',
-    customPosition: 1,
-    text: ''
-  },
-  delete: {
-    enabled: false,
-    processExt: false,
-    type: 'start',
-    count: 1,
-    startPos: 1
-  },
-  pad: {
-    enabled: false,
-    processExt: false,
-    startPos: 1,
-    targetLength: 2,
-    fillChar: '0'
+    charPosition: 1,
+    searchString: '',
+    text: '',
+    sequenceType: 'arabic',
+    startNumber: 1,
+    digits: 3,
+    prefix: '',
+    suffix: ''
   },
   sequence: {
     enabled: false,
     processExt: false,
-    startNumber: 1,
-    increment: 1,
-    digits: 3,
-    position: 'prefix',
-    separator: '_'
+    groupIndex: 1,
+    targetLength: 2,
+    fillChar: '0'
   },
   newName: {
     enabled: false,
     processExt: false,
-    template: 'file_{n}',
-    startNumber: 1,
-    increment: 1,
-    digits: 3
+    template: ''
   },
   regex: {
     enabled: false,
@@ -721,13 +884,55 @@ const processForm = ref<ProcessForm>({
   }
 })
 
-const activeFilters = ref<FilterCondition[]>([])
+const activeProcessTab = ref('replace')
+const showPath = ref(false)
 
-const fileList = computed(() => {
-  return fileStore.files || []
+const filterFields = [
+  { label: '文件名', value: 'name' },
+  { label: '后缀名', value: 'extension' },
+  { label: '大小', value: 'size' },
+  { label: '修改时间', value: 'lastModified' }
+]
+
+const conditionMap: Record<string, string> = {
+  'contains': '包含',
+  'notContains': '不包含',
+  'startsWith': '开头是',
+  'endsWith': '结尾是',
+  'equals': '等于',
+  'gt': '大于',
+  'gte': '大于等于',
+  'lt': '小于',
+  'lte': '小于等于',
+  'between': '介于',
+  'after': '晚于',
+  'before': '早于'
+}
+
+const filterForm = ref<FilterCondition>({
+  type: 'include',
+  field: 'name',  // 默认选择"文件名"
+  condition: 'contains',
+  value: '',
+  ignoreCase: true,
+  startDate: '',
+  endDate: '',
+  sizeValue: 0,
+  sizeUnit: 'MB'
 })
 
-const filteredFileList = ref<any[]>([])
+const tableData = computed(() => {
+  const files = filteredFileList.value || []
+  return previewMode.value === 'affected' 
+    ? files.filter(file => file.name !== file.newName)
+    : files
+})
+
+const hasFiles = computed(() => fileStore.files?.length > 0)
+const hasFilteredFiles = computed(() => filteredFileList.value?.length > 0)
+
+
+const fileCount = computed(() => fileStore?.files?.length || 0)
 
 const handleFileSelect = async () => {
   try {
@@ -742,14 +947,14 @@ const handleFileSelect = async () => {
     })
     
     for (const handle of fileHandles) {
-      const file = await handle.getFile()
+      const fileEntry = handle as FileSystemFileHandle
+      const file = await fileEntry.getFile()
       
       const fileWithHandle: FileWithHandle = {
         name: file.name,
         size: file.size,
         type: file.type,
         lastModified: file.lastModified,
-        handle: handle,
         path: dirHandle.name,  // 使用选择的目录名称
         arrayBuffer: () => file.arrayBuffer(),
         slice: (start?: number, end?: number) => file.slice(start, end),
@@ -761,8 +966,8 @@ const handleFileSelect = async () => {
     }
 
     handleFiles(files)
-  } catch (error) {
-    if (error.name !== 'AbortError') {
+  } catch (error: unknown) {
+    if ((error as { name?: string }).name !== 'AbortError') {
       console.error('选择文件失败:', error)
       ElMessage.error('选择文件失败')
     }
@@ -774,10 +979,10 @@ const handleFolderSelect = async () => {
     const dirHandle = await window.showDirectoryPicker()
     const files: FileWithHandle[] = []
     
-    await traverseDirectory(dirHandle, dirHandle.name, files)
+    await traverseDirectory(dirHandle as FileSystemDirectoryHandle, dirHandle.name, files)
     handleFiles(files)
-  } catch (error) {
-    if (error.name !== 'AbortError') {  // 忽略用户取消操作
+  } catch (error: unknown) {
+    if ((error as { name?: string }).name !== 'AbortError') {  // 忽略用户取消操作
       console.error('选择文件夹失败:', error)
       ElMessage.error('选择文件夹失败')
     }
@@ -787,14 +992,14 @@ const handleFolderSelect = async () => {
 const traverseDirectory = async (dirHandle: FileSystemDirectoryHandle, parentPath: string, files: FileWithHandle[]) => {
   for await (const entry of dirHandle.values()) {
     if (entry.kind === 'file') {
-      const file = await entry.getFile()
+      const fileEntry = entry as FileSystemFileHandle
+      const file = await fileEntry.getFile()
       
       const fileWithHandle: FileWithHandle = {
         name: file.name,
         size: file.size,
         type: file.type,
         lastModified: file.lastModified,
-        handle: entry,
         path: parentPath,
         arrayBuffer: () => file.arrayBuffer(),
         slice: (start?: number, end?: number) => file.slice(start, end),
@@ -804,28 +1009,68 @@ const traverseDirectory = async (dirHandle: FileSystemDirectoryHandle, parentPat
       
       files.push(fileWithHandle)
     } else if (entry.kind === 'directory') {
-      await traverseDirectory(entry, `${parentPath}/${entry.name}`, files)
+      await traverseDirectory(entry as FileSystemDirectoryHandle, `${parentPath}/${entry.name}`, files)
     }
   }
 }
 
 const handleFileDrop = async (event: DragEvent) => {
   event.preventDefault()
-  const items = event.dataTransfer?.items
-  if (items) {
-    try {
-      const files: FileWithHandle[] = []
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i].webkitGetAsEntry()
-        if (item) {
-          await traverseFileTree(item, files)
-        }
-      }
-      handleFiles(files)
-    } catch (err) {
-      console.error('处理拖放文件失败:', err)
+  
+  if (!event.dataTransfer?.items && !event.dataTransfer?.files) {
+    return
+  }
+
+  isProcessingSelected.value = true
+  
+  try {
+    const items = event.dataTransfer.items
+    const files = event.dataTransfer.files
+    
+    if (items) {
+      await processItems(Array.from(items))
+    } else if (files) {
+      await processFiles(Array.from(files))
+    }
+    
+    // 上传完成后刷新文件列表
+    refreshFileList()
+  } catch (error: unknown) {
+    console.error('文件处理失败:', error)
+    ElMessage.error('文件处理失败：' + error)
+  } finally {
+    isProcessingSelected.value = false
+  }
+}
+
+const processItems = async (items: DataTransferItem[]) => {
+  const processedFiles: FileWithHandle[] = []
+  for (const item of items) {
+    const entry = item.webkitGetAsEntry()
+    if (entry) {
+      await traverseFileTree(entry, processedFiles)
     }
   }
+  handleFiles(processedFiles)
+}
+
+const processFiles = async (files: File[]) => {
+  const processedFiles: FileWithHandle[] = []
+  for (const file of files) {
+    const fileWithHandle: FileWithHandle = {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified,
+      path: '根目录',
+      arrayBuffer: () => file.arrayBuffer(),
+      slice: (start?: number, end?: number) => file.slice(start, end),
+      stream: () => file.stream(),
+      text: () => file.text()
+    }
+    processedFiles.push(fileWithHandle)
+  }
+  handleFiles(processedFiles)
 }
 
 const traverseFileTree = async (item: any, files: FileWithHandle[]) => {
@@ -836,7 +1081,11 @@ const traverseFileTree = async (item: any, files: FileWithHandle[]) => {
       size: file.size,
       type: file.type,
       lastModified: file.lastModified,
-      handle: await item.getFileHandle()
+      path: '根目录',
+      arrayBuffer: () => file.arrayBuffer(),
+      slice: (start?: number, end?: number) => file.slice(start, end),
+      stream: () => file.stream(),
+      text: () => file.text()
     }
     files.push(fileWithHandle)
   } else if (item.isDirectory) {
@@ -898,80 +1147,19 @@ const removeSelectedFiles = () => {
 }
 
 watch(() => fileStore.files, (newFiles) => {
-  const files = isProcessingSelected.value ? selectedFiles.value : newFiles || []
-  filteredFileList.value = files.map((file) => ({
-    name: file.name,
-    newName: file.name,
-    size: file.size,
-    type: file.type,
-    path: file.path,
-    lastModified: file.lastModified
-  }))
-}, { immediate: true })
+  if (newFiles?.length) {
+    refreshFileList()
+  } else {
+    filteredFileList.value = []
+  }
+}, { immediate: true, deep: true })
 
-watch(
-  [processForm, activeFilters],
-  () => {
-    // 更新文件列表中的 newName
-    filteredFileList.value = filteredFileList.value.map((file, index) => {
-      const processor = new RenameProcessor(processForm.value)
-      const newName = processor.processFileName(file.name, index)
-      
-      return {
-        ...file,
-        newName
-      }
-    })
-
-    // 应用过滤条件
-    filteredFileList.value = filteredFileList.value.filter(file => {
-      return activeFilters.value.every(filter => {
-        switch (filter.field) {
-          case 'filename':
-            return checkStringCondition(
-              file.name.slice(0, file.name.lastIndexOf('.')),
-              filter.value as string,
-              filter.condition,
-              filter.ignoreCase ?? false
-            )
-          case 'extension':
-            const ext = file.name.slice(file.name.lastIndexOf('.') + 1)
-            return checkStringCondition(
-              ext,
-              filter.value as string,
-              filter.condition,
-              filter.ignoreCase ?? false
-            )
-          case 'size':
-            return checkSizeCondition(
-              file.size,
-              filter.sizeValue as number,
-              filter.condition,
-              filter.sizeUnit as string
-            )
-          case 'lastModified':
-            return checkTimeCondition(file.lastModified, filter)
-          default:
-            return true
-        }
-      })
-    })
-
-    console.group('处理文件重命名')
-    filteredFileList.value.forEach((file, index) => {
-      console.log(`处理文件 ${index + 1}:`, {
-        原文件名: file.name,
-        新文件名: file.newName
-      })
-    })
-    console.log('处理后的文件列表:', filteredFileList.value)
-    console.groupEnd()
-  },
-  { deep: true }
-)
+watch([processForm, activeFilters], () => {
+  nextTick(refreshFileList)
+}, { deep: true })
 
 // 检查字符串条件
-const checkStringCondition = (value: string, pattern: string, condition: string, ignoreCase: boolean) => {
+function checkStringCondition(value: string, pattern: string, condition: string, ignoreCase: boolean) {
   if (ignoreCase) {
     value = value.toLowerCase()
     pattern = pattern.toLowerCase()
@@ -994,8 +1182,8 @@ const checkStringCondition = (value: string, pattern: string, condition: string,
 }
 
 // 检查大小条件
-const checkSizeCondition = (fileSize: number, targetSize: number, condition: string, unit: string) => {
-  const unitMultiplier = {
+function checkSizeCondition(fileSize: number, targetSize: number, condition: string, unit: string) {
+  const unitMultiplier: Record<string, number> = {
     'B': 1,
     'KB': 1024,
     'MB': 1024 * 1024,
@@ -1003,26 +1191,38 @@ const checkSizeCondition = (fileSize: number, targetSize: number, condition: str
     'TB': 1024 * 1024 * 1024 * 1024
   }
   
-  const targetBytes = targetSize * unitMultiplier[unit as keyof typeof unitMultiplier]
+  const targetBytes = targetSize * (unitMultiplier[unit] || 1)
   
   switch (condition) {
-    case 'gt':
-      return fileSize > targetBytes
-    case 'gte':
-      return fileSize >= targetBytes
-    case 'lt':
-      return fileSize < targetBytes
-    case 'lte':
-      return fileSize <= targetBytes
-    case 'equals':
-      return fileSize === targetBytes
+    case 'gt': return fileSize > targetBytes
+    case 'gte': return fileSize >= targetBytes
+    case 'lt': return fileSize < targetBytes
+    case 'lte': return fileSize <= targetBytes
+    case 'equals': return fileSize === targetBytes
+    default: return true
+  }
+}
+
+// 检查时间条件
+function checkTimeCondition(fileTime: number, filter: FilterCondition) {
+  const fileDate = new Date(fileTime)
+  
+  switch (filter.condition) {
+    case 'between':
+      const startDate = filter.startDate ? new Date(filter.startDate) : null
+      const endDate = filter.endDate ? new Date(filter.endDate) : null
+      return (!startDate || fileDate >= startDate) && (!endDate || fileDate <= endDate)
+    case 'after':
+      return fileDate >= new Date(filter.startDate as string)
+    case 'before':
+      return fileDate <= new Date(filter.endDate as string)
     default:
       return true
   }
 }
 
-// 修改时间条件的处理逻辑
-const handleFilter = () => {
+// 修改文件过滤逻辑中的时间判断
+function addFilter() {
   // 验证是否为空
   if (filterForm.value.field === 'size') {
     if (filterForm.value.sizeValue === undefined || filterForm.value.sizeValue === null) {
@@ -1042,7 +1242,7 @@ const handleFilter = () => {
     } else {
       filterForm.value.condition = 'before'
     }
-  } else if (!filterForm.value.value) {
+  } else if (!filterForm.value.value && filterForm.value.field !== 'size' && filterForm.value.field !== 'lastModified') {
     ElMessage.warning('请输入过滤条件的值')
     return
   }
@@ -1056,15 +1256,14 @@ const handleFilter = () => {
     const fieldMap: Record<string, string> = {
       'size': '文件大小',
       'lastModified': '修改时间',
-      'filename': '文件名',
-      'extension': '后缀名'
+      'name': '文件名',
+      'path': '目录'
     }
     ElMessage.warning(`已存在${fieldMap[filterForm.value.field]}的过滤条件，请先删除原有条件`)
     return
   }
 
-  // 创建新的过滤条件
-  const newFilter: FilterCondition = {
+  const filter: FilterCondition = {
     type: filterForm.value.type,
     field: filterForm.value.field,
     condition: filterForm.value.condition,
@@ -1072,70 +1271,56 @@ const handleFilter = () => {
     ignoreCase: filterForm.value.ignoreCase
   }
 
-  if (filterForm.value.field === 'lastModified') {
-    newFilter.startDate = filterForm.value.startDate
-    newFilter.endDate = filterForm.value.endDate
+  if (filterForm.value.field === 'size') {
+    filter.sizeValue = filterForm.value.sizeValue
+    filter.sizeUnit = filterForm.value.sizeUnit
+  } else if (filterForm.value.field === 'lastModified') {
+    filter.startDate = filterForm.value.startDate
+    filter.endDate = filterForm.value.endDate
   }
 
-  activeFilters.value.push(newFilter)
+  activeFilters.value.push(filter)
+  
+  // 重置表单
+  filterForm.value = {
+    type: 'include',
+    field: 'name',  // 重置为"文件名"
+    condition: 'contains',
+    value: '',
+    ignoreCase: true,
+    startDate: '',
+    endDate: '',
+    sizeValue: 0,
+    sizeUnit: 'MB'
+  }
+
   ElMessage.success('添加过滤条件成功')
 }
 
-// 修改文件过滤逻辑中的时间判断
-const checkTimeCondition = (fileTime: number, filter: FilterCondition) => {
-  const modTime = new Date(fileTime)
-  
-  switch (filter.condition) {
-    case 'between':
-      return modTime >= new Date(filter.startDate as string) &&
-             modTime <= new Date(filter.endDate as string)
-    case 'after':
-      return modTime >= new Date(filter.startDate as string)
-    case 'before':
-      return modTime <= new Date(filter.endDate as string)
-    default:
-      return true
-  }
-}
-
 // 修改过滤条件描述文本
-const getFilterDescription = (filter: FilterCondition) => {
+function getFilterLabel(filter: FilterCondition) {
+  const fieldLabel = filterFields.find(f => f.value === filter.field)?.label || filter.field
+  let conditionText = conditionMap[filter.condition] || filter.condition
+  let valueText = ''
+
   switch (filter.field) {
     case 'size':
-      return `文件${getSizeConditionText(filter.condition)}${filter.sizeValue}${filter.sizeUnit}`
+      valueText = `${filter.sizeValue}${filter.sizeUnit}`
+      break
     case 'lastModified':
       if (filter.condition === 'between') {
-        return `修改时间在 ${filter.startDate} 至 ${filter.endDate} 之间`
+        valueText = `${filter.startDate} 至 ${filter.endDate}`
       } else if (filter.condition === 'after') {
-        return `修改时间在 ${filter.startDate} 之后`
+        valueText = filter.startDate as string
       } else {
-        return `修改时间在 ${filter.endDate} 之前`
+        valueText = filter.endDate as string
       }
+      break
     default:
-      return `${filter.field === 'filename' ? '文件名' : '后缀名'}${getConditionText(filter.condition)} "${filter.value}"${filter.ignoreCase ? ' (忽略大小写)' : ''}`
+      valueText = filter.value.toString()
   }
-}
 
-const getSizeConditionText = (condition: string) => {
-  const map: Record<string, string> = {
-    'gt': '大于',
-    'gte': '大于等于',
-    'lt': '小于',
-    'lte': '小于等于',
-    'equals': '等于'
-  }
-  return map[condition] || condition
-}
-
-const getConditionText = (condition: string) => {
-  const map: Record<string, string> = {
-    'contains': '包含',
-    'notContains': '不包含',
-    'startsWith': '开始于',
-    'endsWith': '结束于',
-    'equals': '等于'
-  }
-  return map[condition] || condition
+  return `${fieldLabel} ${conditionText} ${valueText}`
 }
 
 // 监听 field 变化，设置对应的默认条件
@@ -1154,14 +1339,14 @@ watch(() => filterForm.value.field, (newField) => {
 })
 
 // 清除所有过滤规则
-const clearFilters = () => {
+function clearFilters() {
   // 清空过滤条件数组
   activeFilters.value = []
   
   // 重置过滤表单
   filterForm.value = {
     type: 'include',
-    field: 'filename',
+    field: 'name',
     condition: 'contains',
     value: '',
     ignoreCase: true,
@@ -1181,83 +1366,84 @@ const handleExecute = async () => {
       return
     }
 
-    const hasChanges = filteredFileList.value.some(file => file.name !== file.newName)
-    if (!hasChanges) {
+    const changedFiles = filteredFileList.value.filter(file => file.name !== file.newName)
+    if (!changedFiles.length) {
       ElMessage.warning('没有文件需要重命名')
       return
     }
 
-    await ElMessageBox.confirm(
-      '确定要执行重命名操作吗？此操作不可撤销',
-      '确认重命名',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
+    // 检查重名
+    const newNames = changedFiles.map(f => f.newName)
+    if (new Set(newNames).size !== newNames.length) {
+      ElMessage.error('重命名后存在重复的文件名')
+      return
+    }
 
-    // 请求目录权限
+    // 请求用户选择目录
     const dirHandle = await window.showDirectoryPicker({
       mode: 'readwrite'
     })
 
-    // 验证目录中是否存在所有待重命名的文件
-    try {
-      for (const file of filteredFileList.value) {
-        if (file.name === file.newName) continue
-        await dirHandle.getFileHandle(file.name)
-      }
-    } catch (error) {
-      ElMessage.error('保存目录选择错误：目录中未找到待重命名的文件')
-      return
+    // 记录重命名操作
+    const historyRecord = {
+      files: changedFiles.map(file => ({
+        oldName: file.name,
+        newName: file.newName
+      }))
     }
 
-    const promises = filteredFileList.value.map(async (file) => {
-      if (file.name === file.newName) return
-
+    // 执行重命名操作
+    const promises = changedFiles.map(async (file: ProcessedFile) => {
       try {
-        const oldFileHandle = await dirHandle.getFileHandle(file.name)
-        const oldFile = await oldFileHandle.getFile()
+        const fileHandle = await dirHandle.getFileHandle(file.name)
+        const fileContent = await fileHandle.getFile()
         
+        // 创建新文件并写入内容
         const newFileHandle = await dirHandle.getFileHandle(file.newName, { create: true })
         const writable = await newFileHandle.createWritable()
-        
-        await writable.write(await oldFile.arrayBuffer())
+        await writable.write(await fileContent.arrayBuffer())
         await writable.close()
         
+        // 删除旧文件
         await dirHandle.removeEntry(file.name)
 
-        return {
-          oldName: file.name,
-          newName: file.newName,
-          success: true
-        }
-      } catch (error) {
+        return { success: true }
+      } catch (error: unknown) {
         console.error('重命名失败:', error)
-        return {
-          oldName: file.name,
-          newName: file.newName,
-          success: false,
-          error
-        }
+        return { success: false, error }
       }
     })
 
     const results = await Promise.all(promises)
-    const succeeded = results.filter(r => r && r.success).length
-    const failed = results.filter(r => r && !r.success).length
+    const succeeded = results.filter(r => r.success).length
+    const failed = results.length - succeeded
 
     if (succeeded > 0) {
+      // 添加到历史记录
+      historyStore.addRecord(historyRecord.files)
       ElMessage.success(`成功重命名 ${succeeded} 个文件`)
-      fileStore.clearFiles()
+      
+      // 更新文件列表
+      const updatedFiles = fileStore.files.map(file => {
+        const renamedFile = changedFiles.find(f => f.name === file.name)
+        if (renamedFile) {
+          return {
+            ...file,
+            name: renamedFile.newName,
+            newName: renamedFile.newName
+          }
+        }
+        return file
+      })
+      fileStore.$patch({ files: updatedFiles })
     }
+
     if (failed > 0) {
       ElMessage.error(`${failed} 个文件重命名失败`)
     }
 
-  } catch (error) {
-    if (error !== 'cancel') {
+  } catch (error: unknown) {
+    if ((error as { name?: string }).name !== 'AbortError') {
       console.error('重命名操作失败:', error)
       ElMessage.error('重命名操作失败：' + error)
     }
@@ -1265,45 +1451,244 @@ const handleExecute = async () => {
 }
 
 const handleClear = () => {
-  ElMessageBox.confirm('确定要清空所有待处理的文件吗?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    fileStore.$patch({
-      files: []
-    })
-    selectedFiles.value = []
-    isProcessingSelected.value = false
+  ElMessageBox.confirm(
+    '确定要清空所有文件吗？',
+    '警告',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    fileStore.clearFiles()
+    historyStore.clear()
     ElMessage.success('已清空所有文件')
   }).catch(() => {})
 }
 
 const handleRefresh = () => {
-  fileStore.$patch({
-    files: [...fileStore.files]
-  })
+  refreshFileList()
   ElMessage.success('刷新成功')
 }
 
 const removeFilter = (index: number) => {
-  const removedFilter = activeFilters.value[index]
-  activeFilters.value.splice(index, 1)
-  
-  // 可选：清空对应的输入
-  if (filterForm.value.field === removedFilter.field) {
-    if (removedFilter.field === 'size') {
-      filterForm.value.sizeValue = 0
-    } else if (removedFilter.field === 'lastModified') {
-      filterForm.value.startDate = ''
-      filterForm.value.endDate = ''
-    } else {
-      filterForm.value.value = ''
-    }
+  if (!activeFilters.value) return
+  activeFilters.value = activeFilters.value.filter((_, i) => i !== index)
+  nextTick(() => {
+    refreshFileList()
+  })
+}
+
+// 修改 refreshFileList 方法
+function refreshFileList() {
+  if (!fileStore.files?.length) {
+    filteredFileList.value = []
+    return
   }
 
-  ElMessage.success('删除过滤条件成功')
+  const processor = new RenameProcessor(processForm.value as RenameProcessForm)
+  
+  let files = [...fileStore.files]
+  if (activeFilters.value?.length) {
+    files = files.filter(file => {
+      return activeFilters.value.every(filter => {
+        if (!filter) return true
+        
+        // 获取过滤结果
+        const matchesFilter = applyFilter(file, filter)
+        
+        // 根据 type 决定是包含还是排除
+        return filter.type === 'include' ? matchesFilter : !matchesFilter
+      })
+    })
+  }
+
+  filteredFileList.value = files.map((file, index) => ({
+    ...file,
+    newName: processor.processFileName(file.name, index)
+  })) as ProcessedFile[]
 }
+
+// 过滤器应用函数
+function applyFilter(file: FileWithHandle, filter: FilterCondition): boolean {
+  switch (filter.field) {
+    case 'name': {
+      const name = file.name.substring(0, file.name.lastIndexOf('.') || file.name.length)
+      return checkStringCondition(name, filter.value.toString(), filter.condition, filter.ignoreCase ?? true)
+    }
+    case 'extension': {
+      const ext = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.') + 1) : ''
+      return checkStringCondition(ext, filter.value.toString(), filter.condition, filter.ignoreCase ?? true)
+    }
+    case 'size':
+      return checkSizeCondition(file.size, filter.sizeValue || 0, filter.condition, filter.sizeUnit || 'B')
+    case 'lastModified':
+      return checkTimeCondition(file.lastModified, filter)
+    case 'path':
+      return checkStringCondition(file.path, filter.value.toString(), filter.condition, filter.ignoreCase ?? true)
+    default:
+      return true
+  }
+}
+
+// 修改重做功能
+const handleRedo = async () => {
+  try {
+    const record = await historyStore.redo()
+    if (!record) {
+      ElMessage.warning('没有可重做的操作')
+      return
+    }
+
+    const dirHandle = await window.showDirectoryPicker({
+      mode: 'readwrite'
+    })
+
+    const promises = record.files.map(async (file) => {
+      try {
+        // 获取旧文件内容
+        const oldFileHandle = await dirHandle.getFileHandle(file.oldName)
+        const fileContent = await oldFileHandle.getFile()
+        
+        // 创建新文件名的文件
+        const newFileHandle = await dirHandle.getFileHandle(file.newName, { create: true })
+        const writable = await newFileHandle.createWritable()
+        await writable.write(await fileContent.arrayBuffer())
+        await writable.close()
+        
+        // 删除旧文件名的文件
+        await dirHandle.removeEntry(file.oldName)
+
+        return { success: true, file }
+      } catch (error) {
+        console.error('重做失败:', error)
+        return { success: false, error }
+      }
+    })
+
+    const results = await Promise.all(promises)
+    const succeeded = results.filter(r => r.success)
+    const failed = results.length - succeeded.length
+
+    if (succeeded.length > 0) {
+      // 更新文件列表
+      const updatedFiles = fileStore.files.map(file => {
+        const redoneFile = succeeded.find(r => r.file?.oldName === file.name)
+        if (redoneFile?.file) {
+          return {
+            ...file,
+            name: redoneFile.file.newName,
+            newName: redoneFile.file.newName
+          }
+        }
+        return file
+      })
+      fileStore.$patch({ files: updatedFiles })
+      ElMessage.success(`成功重做 ${succeeded.length} 个文件的重命名`)
+    }
+
+    if (failed > 0) {
+      ElMessage.error(`${failed} 个文件重做失败`)
+    }
+
+  } catch (error: unknown) {
+    if ((error as { name?: string }).name !== 'AbortError') {
+      console.error('重做操作失败:', error)
+      ElMessage.error('重做操作失败：' + error)
+    }
+  }
+}
+
+// 修改撤销功能
+const handleUndo = async () => {
+  try {
+    const record = await historyStore.undo()
+    if (!record) {
+      ElMessage.warning('没有可撤销的操作')
+      return
+    }
+
+    const dirHandle = await window.showDirectoryPicker({
+      mode: 'readwrite'
+    })
+
+    const promises = record.files.map(async (file) => {
+      try {
+        // 获取新文件内容
+        const newFileHandle = await dirHandle.getFileHandle(file.newName)
+        const fileContent = await newFileHandle.getFile()
+        
+        // 创建旧文件名的文件
+        const oldFileHandle = await dirHandle.getFileHandle(file.oldName, { create: true })
+        const writable = await oldFileHandle.createWritable()
+        await writable.write(await fileContent.arrayBuffer())
+        await writable.close()
+        
+        // 删除新文件名的文件
+        await dirHandle.removeEntry(file.newName)
+
+        return { success: true, file }
+      } catch (error) {
+        console.error('撤销失败:', error)
+        return { success: false, error }
+      }
+    })
+
+    const results = await Promise.all(promises)
+    const succeeded = results.filter(r => r.success)
+    const failed = results.length - succeeded.length
+
+    if (succeeded.length > 0) {
+      // 更新文件列表
+      const updatedFiles = fileStore.files.map(file => {
+        const undoneFile = succeeded.find(r => r.file?.newName === file.name)
+        if (undoneFile?.file) {
+          return {
+            ...file,
+            name: undoneFile.file.oldName,
+            newName: undoneFile.file.oldName
+          }
+        }
+        return file
+      })
+      fileStore.$patch({ files: updatedFiles })
+      ElMessage.success(`成功撤销 ${succeeded.length} 个文件的重命名`)
+    }
+
+    if (failed > 0) {
+      ElMessage.error(`${failed} 个文件撤销失败`)
+    }
+
+  } catch (error: unknown) {
+    if ((error as { name?: string }).name !== 'AbortError') {
+      console.error('撤销操作失败:', error)
+      ElMessage.error('撤销操作失败：' + error)
+    }
+  }
+}
+
+// 修改行类名函数
+const getRowClassName = ({ row, rowIndex }: { row: ProcessedFile, rowIndex: number }) => {
+  const classes = []
+  
+  // 添加变更标记
+  if (row.name !== row.newName) {
+    classes.push('changed-row')
+  }
+  
+  // 添加奇偶行标记
+  classes.push(rowIndex % 2 === 0 ? 'even-row' : 'odd-row')
+  
+  return classes.join(' ')
+}
+
+filteredFileList.value = fileStore.files.map(file => ({
+  ...file,
+  newName: file.name // 初始时 newName 与原名相同
+}))
+
+// 添加控制 popover 显示的变量
+const helpVisible = ref(false)
 
 declare global {
   interface Window {
@@ -1319,28 +1704,54 @@ declare global {
   interface FileSystemDirectoryHandle {
     values: () => AsyncIterableIterator<FileSystemHandle>;
     getFileHandle: (name: string, options?: { create?: boolean }) => Promise<FileSystemFileHandle>;
-    removeEntry: (name: string) => Promise<void>;
+    removeEntry: (name: string, options?: FileSystemRemoveOptions) => Promise<void>;
   }
   
   interface FileSystemFileHandle {
     getFile: () => Promise<File>;
     move: (newName: string) => Promise<void>;
     getParentDirectory: () => Promise<FileSystemDirectoryHandle | null>;
-    createWritable: () => Promise<FileSystemWritableFileStream>;
+    createWritable: (options?: FileSystemCreateWritableOptions) => Promise<FileSystemWritableFileStream>;
     getParent: () => Promise<FileSystemDirectoryHandle | null>;
   }
   
   interface FileSystemHandle {
-    kind: 'file' | 'directory';
-    name: string;
+    readonly kind: 'file' | 'directory';
+    readonly name: string;
   }
 
   interface FileSystemWritableFileStream extends WritableStream {
-    write: (data: ArrayBuffer | Blob | string) => Promise<void>;
+    write: (data: FileSystemWriteChunkType) => Promise<void>;
     close: () => Promise<void>;
   }
 }
 
+// 处理文件名的函数
+const processFileName = (file: FileWithHandle): string => {
+  let newName = file.name
+
+  // 处理正则替换
+  if (processForm.regex.enabled) {
+    newName = processRegexRename(
+      newName,
+      processForm.regex.pattern,
+      processForm.regex.replacement,
+      {
+        processExt: processForm.regex.processExt,
+        useGlobal: processForm.regex.useGlobal,
+        ignoreCase: processForm.regex.ignoreCase
+      }
+    )
+  }
+
+  return newName
+}
+
+const regexHelpVisible = ref(false)
+
+const showRegexHelp = () => {
+  regexHelpVisible.value = true
+}
 </script>
 
 <style scoped>
@@ -1611,5 +2022,384 @@ declare global {
   border-radius: 50%;
   background-color: #67C23A;
   display: inline-block;
+}
+
+.operation-buttons {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px;
+  border-top: 1px solid var(--el-border-color-light);
+}
+
+.history-buttons {
+  margin-left: auto;
+  margin-right: 16px;
+}
+
+:deep(.el-button) {
+  padding: 8px 16px;
+}
+
+:deep(.el-button [class*=el-icon]+span) {
+  margin-left: 6px;
+}
+
+/* 修改表格样式 */
+:deep(.el-table) {
+  --el-table-row-hover-bg-color: #f5f7fa;
+  --el-table-border-color: #ebeef5;
+  --el-table-header-bg-color: #f5f7fa;
+}
+
+/* 默认所有行都是白色背景 */
+:deep(.el-table__row) {
+  background-color: #ffffff !important;
+}
+
+/* 变更的奇数行 - 较深的蓝色 */
+:deep(.changed-row.odd-row) {
+  background-color: #ecf5ff !important;
+  color: var(--el-color-primary);
+}
+
+/* 变更的偶数行 - 较浅的蓝色 */
+:deep(.changed-row.even-row) {
+  background-color: #f5f9ff !important;
+  color: var(--el-color-primary);
+}
+
+/* 变更行悬停效果 */
+:deep(.changed-row:hover td) {
+  background-color: #e3effd !important;
+}
+
+/* 表格边框和分割线 */
+:deep(.el-table) {
+  border: 1px solid var(--el-table-border-color);
+}
+
+:deep(.el-table__cell) {
+  border-bottom: 1px solid var(--el-table-border-color);
+}
+
+/* 表头样式 */
+:deep(.el-table__header-wrapper th) {
+  background-color: var(--el-table-header-bg-color);
+  color: var(--el-text-color-primary);
+  font-weight: bold;
+}
+
+.view-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.show-path-checkbox {
+  margin-left: 16px;
+}
+
+.variable-help {
+  padding: 0px;
+}
+
+.help-page {
+  height: 680px;
+  padding: 12px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.help-title {
+  color: var(--el-color-primary);
+  margin-bottom: 20px;
+  font-size: 25px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.vars-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.var-group {
+  background-color: var(--el-fill-color-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.var-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.var-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.var-desc {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+}
+
+.var-tip {
+  margin-top: 12px;
+  padding: 8px;
+  background-color: var(--el-color-info-light-9);
+  border-radius: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+code {
+  font-family: Monaco, Consolas, monospace;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.code-example {
+  display: inline-block;
+  margin: 4px 0;
+  background-color: var(--el-color-info-light-9);
+  color: var(--el-color-info);
+}
+
+.example-content {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding: 20px;
+  background-color: var(--el-fill-color-light);
+  border-radius: 8px;
+}
+
+.divider {
+  display: none;
+}
+
+.example-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.code-block {
+  margin: 12px 0;
+  background-color: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-family: Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 3;
+  word-break: break-all;
+}
+
+.result-text {
+  margin: 10px 0;
+  background-color: var(--el-fill-color-lighter);
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-family: Monaco, Consolas, monospace;
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  line-height: 1.5;
+}
+
+.code-label, .result-label {
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+  margin: 0px 0;
+}
+
+.example-desc {
+  margin-top: 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 2;
+  font-style: italic;
+}
+
+.code-primary { background-color: var(--el-color-primary-light-9); color: var(--el-color-primary); }
+.code-success { background-color: var(--el-color-success-light-9); color: var(--el-color-success); }
+.code-warning { background-color: var(--el-color-warning-light-9); color: var(--el-color-warning); }
+.code-info { background-color: var(--el-color-info-light-9); color: var(--el-color-info); }
+.code-danger { background-color: var(--el-color-danger-light-9); color: var(--el-color-danger); }
+
+.el-dialog__body {
+  padding: 0 !important;
+}
+
+.variable-help {
+  margin: 0;
+  padding: 0;
+}
+
+/* 调整对话框样式 */
+.variable-help-dialog {
+  --el-dialog-padding-primary: 0;
+}
+
+.variable-help-dialog .el-dialog__header {
+  padding: 20px;
+  margin-right: 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.variable-help-dialog .el-dialog__body {
+  padding: 0 !important;
+}
+
+/* 调整轮播图指示器位置 */
+.variable-help-dialog .el-carousel__indicators {
+  bottom: 20px;
+}
+
+/* 美化滚动条 */
+.help-page::-webkit-scrollbar {
+  width: 6px;
+}
+
+.help-page::-webkit-scrollbar-thumb {
+  background-color: var(--el-border-color);
+  border-radius: 3px;
+}
+
+.help-page::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.help-page {
+  padding: 20px;
+}
+
+.page-title {
+  font-size: 20px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.vars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.var-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.var-desc {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+}
+
+.format-note {
+  margin-top: 12px;
+  padding: 8px;
+  background-color: var(--el-fill-color-light);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: Monaco, Consolas, monospace;
+}
+
+.regex-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.regex-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.help-slide {
+  padding: 20px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.help-slide h3 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--el-color-primary);
+  font-size: 20px;
+}
+
+.example-box {
+  background: var(--el-bg-color-page);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.example-item {
+  margin-bottom: 16px;
+}
+
+.code-block {
+  background: var(--el-bg-color);
+  padding: 16px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.code-block p {
+  margin: 8px 0;
+  font-family: Monaco, Consolas, monospace;
+}
+
+.result-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--el-color-success);
+}
+
+.example-desc {
+  margin-top: 16px;
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+  font-style: italic;
+}
+
+:deep(.el-carousel__item) {
+  background-color: var(--el-bg-color);
 }
 </style>

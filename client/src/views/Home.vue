@@ -24,19 +24,25 @@
             <h2>{{ module.title }}</h2>
           </div>
           <div class="features-list">
-            <div 
+            <router-link
               v-for="feature in module.features" 
               :key="feature.path"
-              class="feature-item"
-              @click="handleFeatureClick($event, feature.path)"
+              :to="feature.path"
+              custom
+              v-slot="{ navigate }"
             >
-              <el-icon :style="{ color: module.color }"><component :is="feature.icon" /></el-icon>
-              <div class="feature-info">
-                <h3>{{ feature.title }}</h3>
-                <p>{{ feature.description }}</p>
+              <div 
+                class="feature-item"
+                @click="handleFeatureClick($event, navigate)"
+              >
+                <el-icon :style="{ color: module.color }"><component :is="feature.icon" /></el-icon>
+                <div class="feature-info">
+                  <h3>{{ feature.title }}</h3>
+                  <p>{{ feature.description }}</p>
+                </div>
+                <el-icon class="arrow-icon" :style="{ color: module.color }"><ArrowRight /></el-icon>
               </div>
-              <el-icon class="arrow-icon" :style="{ color: module.color }"><ArrowRight /></el-icon>
-            </div>
+            </router-link>
           </div>
         </div>
       </div>
@@ -45,10 +51,8 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
 import { ArrowRight} from '@element-plus/icons-vue'
 
-const router = useRouter()
 
 const modules = [
   {
@@ -147,7 +151,7 @@ const modules = [
   }
 ]
 
-const handleFeatureClick = (event: MouseEvent, path: string) => {
+const handleFeatureClick = (event: MouseEvent, navigate: () => void) => {
   const target = event.currentTarget as HTMLElement
   
   // 添加波纹动画效果
@@ -164,7 +168,7 @@ const handleFeatureClick = (event: MouseEvent, path: string) => {
   setTimeout(() => {
     target.style.transform = 'scale(1)'
     ripple.remove()
-    router.push(path)
+    navigate()
   }, 300)
 }
 </script>

@@ -5,6 +5,7 @@ export interface FileWithHandle {
   lastModified: number;
   handle?: FileSystemFileHandle;
   path: string;
+  newName?: string;
   arrayBuffer: () => Promise<ArrayBuffer>;
   slice: (start?: number, end?: number) => Blob;
   stream: () => ReadableStream;

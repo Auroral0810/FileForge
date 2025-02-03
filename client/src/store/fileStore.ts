@@ -1,18 +1,5 @@
 import { defineStore } from 'pinia'
-// import { ref } from 'vue'
-
-export interface FileWithHandle {
-  name: string
-  size: number
-  type: string
-  lastModified: number
-  handle?: FileSystemFileHandle
-  path: string
-  arrayBuffer: () => Promise<ArrayBuffer>
-  slice: (start?: number, end?: number) => Blob
-  stream: () => ReadableStream
-  text: () => Promise<string>
-}
+import type { FileWithHandle } from '@/types/files'
 
 export const useFileStore = defineStore('file', {
   state: () => ({

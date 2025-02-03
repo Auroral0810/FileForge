@@ -20,6 +20,9 @@ importers:
       axios:
         specifier: ^1.6.0
         version: 1.7.9
+      dayjs:
+        specifier: ^1.11.13
+        version: 1.11.13
       element-plus:
         specifier: ^2.3.0
         version: 2.9.3(vue@3.5.13(typescript@5.7.3))
@@ -32,6 +35,9 @@ importers:
       pinia:
         specifier: ^2.1.0
         version: 2.3.1(typescript@5.7.3)(vue@3.5.13(typescript@5.7.3))
+      uuid:
+        specifier: ^11.0.5
+        version: 11.0.5
       vue:
         specifier: ^3.3.0
         version: 3.5.13(typescript@5.7.3)
@@ -910,6 +916,10 @@ packages:
   undici-types@6.20.0:
     resolution: {integrity: sha512-Ny6QZ2Nju20vw1SRHe3d9jVu6gJ+4e3+MMpqu7pqE5HT6WsTSlce++GQmK5UXS8mzV8DSYHrQH+Xrf2jVcuKNg==}
 
+  uuid@11.0.5:
+    resolution: {integrity: sha512-508e6IcKLrhxKdBbcA2b4KQZlLVp2+J5UwQ6F7Drckkc5N9ZJwFa4TgWtsww9UG8fGHbm6gbV19TdM5pQ4GaIA==}
+    hasBin: true
+
   vite@5.4.14:
     resolution: {integrity: sha512-EK5cY7Q1D8JNhSaPKVK4pwBFvaTmZxEnoKXLG/U9gmdDcihQGNzFlgIvaxezFR4glP1LsuiedwMBqCXH3wZccA==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -1778,6 +1788,8 @@ snapshots:
   typescript@5.7.3: {}
 
   undici-types@6.20.0: {}
+
+  uuid@11.0.5: {}
 
   vite@5.4.14(@types/node@22.13.0)(sass@1.83.4):
     dependencies:
