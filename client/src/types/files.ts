@@ -12,8 +12,14 @@ export interface FileWithHandle {
   text: () => Promise<string>
 }
 
-export interface ProcessedFile extends FileWithHandle {
+export interface ProcessedFile {
+  name: string
   newName: string
+  path: string
+  directory: string
+  size: number
+  lastModified: number
+  type: string
 }
 
 export interface FilterCondition {

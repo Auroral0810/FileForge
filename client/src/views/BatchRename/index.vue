@@ -475,29 +475,30 @@
       </div>
 
       <div class="file-list-container mt-4">
-        <el-table 
-          :data="tableData"
-          height="400"
-          style="width: 100%"
-          :row-class-name="getRowClassName"
+        <VirtualFileList
+          :items="tableData"
+          :item-height="CONFIG.ITEM_HEIGHT"
+          :buffer-size="CONFIG.BUFFER_SIZE"
+          :show-path="showPath"
+          :sort-config="sortConfig"
           @selection-change="handleSelectionChange"
-          :stripe="false"
-        >
-          <el-table-column type="selection" width="55" />
-          <el-table-column prop="name" label="原文件名" min-width="200" />
-          <el-table-column prop="newName" label="新文件名" min-width="200" />
-          <el-table-column prop="size" label="大小" width="120">
-            <template #default="{ row }">
-              {{ formatFileSize(row.size) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="lastModified" label="修改时间" width="180">
-            <template #default="{ row }">
-              {{ formatDate(row.lastModified) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="path" label="路径" min-width="200" v-if="showPath" />
-        </el-table>
+          @sort-change="handleSortChange"
+          style="height: 400px"
+        />
+      </div>
+
+      <!-- 在 operation-buttons 前添加进度条 -->
+      <div class="progress-section" v-if="isProcessing">
+        <el-progress 
+          :percentage="processProgress" 
+          :status="processStatus"
+          :format="progressFormat"
+        />
+        <div class="progress-details">
+          <span>已处理: {{ processedCount }}/{{ totalFiles }} 个文件</span>
+          <span>平均速度: {{ processSpeed }} 个/秒</span>
+          <span>预计剩余时间: {{ remainingTime }}</span>
+        </div>
       </div>
 
       <div class="operation-buttons">
@@ -547,6 +548,25 @@
         </el-button>
       </div>
     </el-card>
+
+    <!-- 添加进度条对话框 -->
+    <el-dialog
+      v-model="progressVisible"
+      title="重命名进度"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      width="400px"
+    >
+      <div class="progress-container">
+        <el-progress
+          :percentage="currentProgress"
+          :format="(percentage) => `${percentage}%`"
+          :status="currentProgress === 100 ? 'success' : ''"
+        />
+        <div class="progress-text">{{ progressText }}</div>
+      </div>
+    </el-dialog>
   </div>
 
   <el-dialog
@@ -815,14 +835,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
-import { useFileStore } from '@/store/fileStore'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { useFileStore } from '@/stores/file'
 import { useHistoryStore } from '@/stores/historyStore'
 import type { FileWithHandle, ProcessedFile, FilterCondition, ProcessForm } from '@/types/files'
 import { RenameProcessor, type ProcessForm as RenameProcessForm } from '@/utils/renameRules'
 import { formatFileSize, formatDate, processRegexRename } from '@/utils/file'
 import { UploadFilled, QuestionFilled, RefreshRight, Delete, Back, Right, Check, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import VirtualFileList from '@/components/VirtualFileList.vue'
 
 const fileStore = useFileStore()
 const historyStore = useHistoryStore()
@@ -922,10 +943,39 @@ const filterForm = ref<FilterCondition>({
 })
 
 const tableData = computed(() => {
-  const files = filteredFileList.value || []
-  return previewMode.value === 'affected' 
-    ? files.filter(file => file.name !== file.newName)
-    : files
+  let files = filteredFileList.value || []
+  
+  // 根据预览模式筛选
+  if (previewMode.value === 'affected') {
+    files = files.filter(file => file.name !== file.newName)
+  }
+
+  // 排序处理
+  if (sortConfig.value.prop && sortConfig.value.order) {
+    files = [...files].sort((a, b) => {
+      const prop = sortConfig.value.prop
+      let aValue = a[prop]
+      let bValue = b[prop]
+
+      // 特殊字段处理
+      if (prop === 'size') {
+        aValue = Number(a.size)
+        bValue = Number(b.size)
+      } else if (prop === 'lastModified') {
+        aValue = Number(a.lastModified)
+        bValue = Number(b.lastModified)
+      } else {
+        aValue = String(aValue).toLowerCase()
+        bValue = String(bValue).toLowerCase()
+      }
+
+      return sortConfig.value.order === 'ascending'
+        ? aValue > bValue ? 1 : -1
+        : aValue < bValue ? 1 : -1
+    })
+  }
+
+  return files
 })
 
 const hasFiles = computed(() => fileStore.files?.length > 0)
@@ -1132,8 +1182,8 @@ const handleFiles = async (files: FileWithHandle[]) => {
   isProcessingSelected.value = false
 }
 
-const handleSelectionChange = (selection: FileWithHandle[]) => {
-  selectedFiles.value = selection
+const handleSelectionChange = (files: ProcessedFile[]) => {
+  selectedFiles.value = files
 }
 
 const removeSelectedFiles = () => {
@@ -1359,42 +1409,213 @@ function clearFilters() {
   ElMessage.success('已清除所有过滤规则')
 }
 
+// 添加进度相关的状态
+const isProcessing = ref(false)
+const processProgress = ref(0)
+const processStatus = ref<'success' | 'exception' | ''>('')
+const processedCount = ref(0)
+const totalFiles = ref(0)
+const processSpeed = ref('0.00')
+const remainingTime = ref('计算中...')
+const startTime = ref(0)
+
+// 更新进度格式化函数
+const progressFormat = (percentage: number) => {
+  if (processStatus.value === 'success') {
+    return '完成'
+  } else if (processStatus.value === 'exception') {
+    return '失败'
+  }
+  return `${percentage}%`
+}
+
+// 添加计算速度和剩余时间的函数
+const updateProcessMetrics = () => {
+  const currentTime = Date.now()
+  const elapsedTime = (currentTime - startTime.value) / 1000 // 转换为秒
+  
+  if (elapsedTime > 0) {
+    // 计算处理速度（个/秒）
+    const speed = processedCount.value / elapsedTime
+    processSpeed.value = speed.toFixed(2)
+    
+    // 计算剩余时间
+    if (speed > 0) {
+      const remainingFiles = totalFiles.value - processedCount.value
+      const remainingSeconds = remainingFiles / speed
+      
+      if (remainingSeconds < 60) {
+        remainingTime.value = `${Math.ceil(remainingSeconds)}秒`
+      } else if (remainingSeconds < 3600) {
+        remainingTime.value = `${Math.ceil(remainingSeconds / 60)}分钟`
+      } else {
+        remainingTime.value = `${(remainingSeconds / 3600).toFixed(1)}小时`
+      }
+    } else {
+      remainingTime.value = '计算中...'
+    }
+  }
+}
+
+// 将所有配置常量统一放在文件顶部
+const CONFIG = {
+  BATCH_SIZE: 200,
+  VISIBLE_ITEMS: 30,
+  BATCH_DELAY: 10,
+  BUFFER_SIZE: 5,
+  ITEM_HEIGHT: 40
+} as const;
+
+// 创建 Worker 实例
+const worker = new Worker(
+  new URL('@/workers/renameWorker.ts', import.meta.url),
+  { type: 'module' }
+);
+
+// Worker 消息处理
+worker.onmessage = (e: MessageEvent) => {
+  const { type, payload } = e.data;
+  
+  switch (type) {
+    case 'renameResults':
+      handleRenameResults(payload);
+      break;
+    case 'validationResults':
+      handleValidationResults(payload);
+      break;
+    case 'conflictsResult':
+      handleConflictsResult(payload);
+      break;
+    case 'error':
+      handleWorkerError(payload);
+      break;
+  }
+};
+
+// 处理重命名结果
+const handleRenameResults = (results: any[]) => {
+  // 更新文件列表中的新文件名
+  filteredFileList.value = results;
+  // 触发UI更新
+  nextTick(() => {
+    updatePreview();
+  });
+};
+
+// 处理验证结果
+const handleValidationResults = (results: any[]) => {
+  const invalidFiles = results.filter(r => !r.isValid);
+  if (invalidFiles.length > 0) {
+    ElMessage.warning(`${invalidFiles.length} 个文件名无效`);
+  }
+};
+
+// 处理冲突检测结果
+const handleConflictsResult = (conflicts: any[]) => {
+  if (conflicts.length > 0) {
+    ElMessage.warning(`检测到 ${conflicts.length} 个文件名冲突`);
+    // 显示冲突文件列表
+    showConflictDialog(conflicts);
+  }
+};
+
+// 处理 Worker 错误
+const handleWorkerError = (error: any) => {
+  console.error('Worker error:', error);
+  ElMessage.error('处理失败：' + error.message);
+};
+
+// 添加进度相关的响应式变量
+const progressVisible = ref(false)
+const currentProgress = ref(0)
+const progressText = ref('')
+
 const handleExecute = async () => {
   try {
-    if (!filteredFileList.value.length) {
-      ElMessage.warning('没有可重命名的文件')
-      return
-    }
+    // 初始化进度状态
+    isProcessing.value = true
+    processProgress.value = 0
+    processStatus.value = ''
+    processedCount.value = 0
+    startTime.value = Date.now()
+    
+    const filesToRename = filteredFileList.value.filter(file => file.name !== file.newName)
+    totalFiles.value = filesToRename.length
 
-    const changedFiles = filteredFileList.value.filter(file => file.name !== file.newName)
-    if (!changedFiles.length) {
-      ElMessage.warning('没有文件需要重命名')
+    // 检查是否有文件
+    if (!filesToRename.length) {
+      ElMessage.warning('没有可重命名的文件')
+      progressVisible.value = false
       return
     }
 
     // 检查重名
-    const newNames = changedFiles.map(f => f.newName)
+    const newNames = filesToRename.map(f => f.newName)
     if (new Set(newNames).size !== newNames.length) {
       ElMessage.error('重命名后存在重复的文件名')
+      progressVisible.value = false
       return
     }
 
     // 请求用户选择目录
+    currentProgress.value = 10
+    progressText.value = '选择目录中...'
+    
     const dirHandle = await window.showDirectoryPicker({
       mode: 'readwrite'
     })
 
-    // 记录重命名操作
-    const historyRecord = {
-      files: changedFiles.map(file => ({
-        oldName: file.name,
-        newName: file.newName
-      }))
+    // 检查目录中是否有源文件
+    currentProgress.value = 20
+    progressText.value = '检查源文件...'
+    
+    let hasSourceFiles = false
+    for (const file of filesToRename) {
+      try {
+        await dirHandle.getFileHandle(file.name)
+        hasSourceFiles = true
+        break
+      } catch (error) {
+        continue
+      }
+    }
+
+    if (!hasSourceFiles) {
+      ElMessage.error('选择的目录下没有找到需要重命名的文件，请确认目录是否正确')
+      progressVisible.value = false
+      return
+    }
+
+    // 检查目标文件是否已存在
+    currentProgress.value = 30
+    progressText.value = '检查目标文件...'
+    
+    const existingFiles: string[] = []
+    for (const file of filesToRename) {
+      try {
+        await dirHandle.getFileHandle(file.newName)
+        existingFiles.push(file.newName)
+      } catch (error) {
+        // 文件不存在，可以继续
+        continue
+      }
+    }
+
+    if (existingFiles.length > 0) {
+      ElMessage.error(`以下文件已存在，为防止数据丢失，已停止重命名操作：\n${existingFiles.join('\n')}`)
+      progressVisible.value = false
+      return
     }
 
     // 执行重命名操作
-    const promises = changedFiles.map(async (file: ProcessedFile) => {
+    const updateInterval = setInterval(() => {
+      updateProcessMetrics()
+    }, 1000)
+
+    const promises = filesToRename.map(async (file, index) => {
       try {
+        progressText.value = `正在重命名: ${file.name} -> ${file.newName}`
+        
         const fileHandle = await dirHandle.getFileHandle(file.name)
         const fileContent = await fileHandle.getFile()
         
@@ -1407,46 +1628,68 @@ const handleExecute = async () => {
         // 删除旧文件
         await dirHandle.removeEntry(file.name)
 
-        return { success: true }
-      } catch (error: unknown) {
+        // 更新进度
+        processedCount.value++
+        processProgress.value = Math.round((processedCount.value / totalFiles.value) * 100)
+        
+        return { success: true, file }
+      } catch (error) {
         console.error('重命名失败:', error)
         return { success: false, error }
       }
     })
 
     const results = await Promise.all(promises)
-    const succeeded = results.filter(r => r.success).length
-    const failed = results.length - succeeded
+    clearInterval(updateInterval)
 
-    if (succeeded > 0) {
+    // 设置最终状态
+    processProgress.value = 100
+    processStatus.value = 'success'
+    
+    // 延迟关闭进度条
+    setTimeout(() => {
+      progressVisible.value = false
+    }, 500)
+
+    if (results.every(r => r.success)) {
       // 添加到历史记录
-      historyStore.addRecord(historyRecord.files)
-      ElMessage.success(`成功重命名 ${succeeded} 个文件`)
+      historyStore.addRecord(results.map(r => ({
+        oldName: r.file.name,
+        newName: r.file.newName
+      })))
       
       // 更新文件列表
       const updatedFiles = fileStore.files.map(file => {
-        const renamedFile = changedFiles.find(f => f.name === file.name)
-        if (renamedFile) {
+        const renamedFile = results.find(r => r.file.name === file.name)
+        if (renamedFile?.file) {
           return {
             ...file,
-            name: renamedFile.newName,
-            newName: renamedFile.newName
+            name: renamedFile.file.newName
           }
         }
         return file
       })
       fileStore.$patch({ files: updatedFiles })
+      ElMessage.success(`成功重命名 ${results.length} 个文件`)
     }
 
-    if (failed > 0) {
-      ElMessage.error(`${failed} 个文件重命名失败`)
+    if (results.some(r => !r.success)) {
+      const failedNames = results.filter(r => !r.success).map(r => r.file.name).join('\n')
+      ElMessage.error(`${results.length - results.filter(r => r.success).length} 个文件重命名失败:\n${failedNames}`)
     }
 
   } catch (error: unknown) {
+    progressVisible.value = false
     if ((error as { name?: string }).name !== 'AbortError') {
       console.error('重命名操作失败:', error)
-      ElMessage.error('重命名操作失败：' + error)
+      ElMessage.error(`重命名操作失败: ${error}`)
     }
+    processStatus.value = 'exception'
+  } finally {
+    // 延迟关闭进度显示
+    setTimeout(() => {
+      isProcessing.value = false
+    }, 1000)
   }
 }
 
@@ -1699,6 +1942,10 @@ declare global {
     showDirectoryPicker: (options?: { 
       mode?: 'read' | 'readwrite' 
     }) => Promise<FileSystemDirectoryHandle>;
+    requestIdleCallback: (
+      callback: IdleRequestCallback,
+      options?: IdleRequestOptions
+    ) => number
   }
   
   interface FileSystemDirectoryHandle {
@@ -1752,6 +1999,90 @@ const regexHelpVisible = ref(false)
 const showRegexHelp = () => {
   regexHelpVisible.value = true
 }
+
+// 添加排序相关的状态
+const sortConfig = ref({
+  prop: '',
+  order: null as 'ascending' | 'descending' | null
+})
+
+// 处理排序变化
+const handleSortChange = ({ prop, order }: { prop: string; order: 'ascending' | 'descending' | null }) => {
+  sortConfig.value = { prop, order }
+}
+
+// 文件元数据接口
+interface FileMeta {
+  handle: FileSystemFileHandle;
+  originalName: string;
+  newName?: string;
+  status: 'pending' | 'processing' | 'renamed' | 'failed';
+  path: string;
+  size?: number;
+  lastModified?: number;
+}
+
+// 文件映射表
+const fileMap = new Map<string, FileMeta>();
+
+// 优化的文件加载函数
+const loadDirectoryContent = async (dirHandle: FileSystemDirectoryHandle, parentPath = '') => {
+  const entries = [];
+  try {
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file') {
+        const path = parentPath ? `${parentPath}/${entry.name}` : entry.name;
+        // 只存储必要的元数据
+        const fileMeta: FileMeta = {
+          handle: entry,
+          originalName: entry.name,
+          status: 'pending',
+          path: path
+        };
+        fileMap.set(path, fileMeta);
+        entries.push(fileMeta);
+      } else if (entry.kind === 'directory') {
+        const newPath = parentPath ? `${parentPath}/${entry.name}` : entry.name;
+        // 递归处理子目录
+        const subEntries = await loadDirectoryContent(entry, newPath);
+        entries.push(...subEntries);
+      }
+    }
+  } catch (error) {
+    console.error('加载目录内容失败:', error);
+    ElMessage.error('加载目录内容失败');
+  }
+  return entries;
+};
+
+// 组件卸载时清理 Worker
+onUnmounted(() => {
+  worker.terminate();
+});
+
+// 监听文件存储的变化
+watch(() => fileStore.files, (newFiles) => {
+  tableData.value = newFiles
+}, { deep: true, immediate: true })
+
+// 处理文件选择
+const handleFilesSelected = async (files: File[]) => {
+  // 处理文件上传
+  await fileStore.addFiles(files)
+  // 确保表格数据更新
+  tableData.value = [...fileStore.files]
+}
+
+// 定义重命名规则
+const currentRules = ref([
+  {
+    type: 'replace',
+    find: '',
+    replace: '',
+    useRegex: false,
+    caseSensitive: false
+  }
+])
 </script>
 
 <style scoped>
@@ -2401,5 +2732,60 @@ code {
 
 :deep(.el-carousel__item) {
   background-color: var(--el-bg-color);
+}
+
+/* 添加进度条样式 */
+.progress-section {
+  margin: 16px 0;
+  padding: 0 16px;
+}
+
+.progress-details {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+:deep(.el-progress-bar__inner) {
+  transition: width 0.3s ease;
+}
+
+:deep(.el-progress__text) {
+  font-size: 13px !important;
+}
+
+/* 添加排序相关样式 */
+:deep(.el-table .caret-wrapper) {
+  height: 34px;
+}
+
+:deep(.el-table .sort-caret.ascending) {
+  top: 5px;
+}
+
+:deep(.el-table .sort-caret.descending) {
+  bottom: 7px;
+}
+
+:deep(.el-table .ascending .sort-caret.ascending) {
+  border-bottom-color: var(--el-color-primary);
+}
+
+:deep(.el-table .descending .sort-caret.descending) {
+  border-top-color: var(--el-color-primary);
+}
+
+.progress-container {
+  padding: 20px;
+}
+
+.progress-text {
+  margin-top: 15px;
+  text-align: center;
+  color: #606266;
+  font-size: 14px;
+  word-break: break-all;
 }
 </style>
