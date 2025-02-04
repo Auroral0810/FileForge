@@ -1,217 +1,149 @@
 <template>
-  <div class="virtual-list-wrapper">
-    <!-- 表头 -->
-    <div class="virtual-list-header">
-      <el-row :gutter="0" align="middle">
-        <el-col :span="1" class="checkbox-cell">
-          <el-checkbox 
-            v-model="isAllSelected"
-            :indeterminate="isIndeterminate"
-            @change="handleSelectAll"
-          />
-        </el-col>
-        <el-col :span="1" class="index-header">序号</el-col>
-        <!-- 目录列 -->
-        <template v-if="showPath">
-          <el-col :span="6" class="header-cell" @click="handleSort('path')">
-            <span>目录</span>
-            <div class="sort-indicators">
-              <el-icon 
-                :class="[
-                  'sort-caret ascending',
-                  { active: sortConfig?.prop === 'path' && sortConfig?.order === 'ascending' }
-                ]"
-              >
-                <ArrowUp />
-              </el-icon>
-              <el-icon 
-                :class="[
-                  'sort-caret descending',
-                  { active: sortConfig?.prop === 'path' && sortConfig?.order === 'descending' }
-                ]"
-              >
-                <ArrowDown />
-              </el-icon>
-            </div>
-          </el-col>
-        </template>
-        <el-col :span="showPath ? 5 : 8" class="header-cell" @click="handleSort('name')">
-          <span>原文件名</span>
-          <div class="sort-indicators">
-            <el-icon 
-              :class="[
-                'sort-caret ascending',
-                { active: sortConfig?.prop === 'name' && sortConfig?.order === 'ascending' }
-              ]"
+  <div class="virtual-list">
+    <!-- 固定表头 -->
+    <div class="table-header">
+      <el-table
+        :data="[{}]"
+        :border="true"
+        style="width: 100%"
+        ref="headerTableRef"
+        @sort-change="handleSortChange"
+      >
+        <el-table-column width="55" fixed="left">
+          <template #default>
+            <el-button 
+              size="small"
+              @click="handleSelectAll"
             >
-              <ArrowUp />
-            </el-icon>
-            <el-icon 
-              :class="[
-                'sort-caret descending',
-                { active: sortConfig?.prop === 'name' && sortConfig?.order === 'descending' }
-              ]"
-            >
-              <ArrowDown />
-            </el-icon>
-          </div>
-        </el-col>
-        <el-col :span="showPath ? 5 : 8" class="header-cell" @click="handleSort('newName')">
-          <span>新文件名</span>
-          <div class="sort-indicators">
-            <el-icon 
-              :class="[
-                'sort-caret ascending',
-                { active: sortConfig?.prop === 'newName' && sortConfig?.order === 'ascending' }
-              ]"
-            >
-              <ArrowUp />
-            </el-icon>
-            <el-icon 
-              :class="[
-                'sort-caret descending',
-                { active: sortConfig?.prop === 'newName' && sortConfig?.order === 'descending' }
-              ]"
-            >
-              <ArrowDown />
-            </el-icon>
-          </div>
-        </el-col>
-        <el-col :span="2" class="header-cell" @click="handleSort('size')">
-          <span>大小</span>
-          <div class="sort-indicators">
-            <el-icon 
-              :class="[
-                'sort-caret ascending',
-                { active: sortConfig?.prop === 'size' && sortConfig?.order === 'ascending' }
-              ]"
-            >
-              <ArrowUp />
-            </el-icon>
-            <el-icon 
-              :class="[
-                'sort-caret descending',
-                { active: sortConfig?.prop === 'size' && sortConfig?.order === 'descending' }
-              ]"
-            >
-              <ArrowDown />
-            </el-icon>
-          </div>
-        </el-col>
-        <el-col :span="4" class="header-cell date-header" @click="handleSort('lastModified')">
-          <span>修改时间</span>
-          <div class="sort-indicators">
-            <el-icon 
-              :class="[
-                'sort-caret ascending',
-                { active: sortConfig?.prop === 'lastModified' && sortConfig?.order === 'ascending' }
-              ]"
-            >
-              <ArrowUp />
-            </el-icon>
-            <el-icon 
-              :class="[
-                'sort-caret descending',
-                { active: sortConfig?.prop === 'lastModified' && sortConfig?.order === 'descending' }
-              ]"
-            >
-              <ArrowDown />
-            </el-icon>
-          </div>
-        </el-col>
-      </el-row>
+              全选
+            </el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="序号" width="60" fixed="left" />
+        <el-table-column 
+          prop="name" 
+          label="原文件名" 
+          sortable="custom"
+          min-width="200"
+          fixed="left"
+        />
+        <el-table-column 
+          prop="newName" 
+          label="新文件名" 
+          sortable="custom"
+          min-width="200"
+        />
+        <el-table-column 
+          v-if="showPath"
+          prop="path" 
+          label="目录" 
+          sortable="custom"
+          min-width="150"
+        />
+        <el-table-column 
+          prop="size" 
+          label="大小" 
+          sortable="custom"
+          width="120"
+        />
+        <el-table-column 
+          prop="lastModified" 
+          label="修改时间"
+          sortable="custom" 
+          width="180"
+        />
+      </el-table>
     </div>
 
-    <!-- 列表内容 -->
-    <div 
-      ref="containerRef"
-      class="virtual-list-container"
-      @scroll="handleScroll"
-    >
-      <div 
-        class="virtual-list-phantom"
-        :style="{ height: `${totalHeight}px` }"
-      ></div>
-      <div
-        class="virtual-list-content"
-        :style="{ transform: `translateY(${startOffset}px)` }"
+    <!-- 可滚动的表格主体 -->
+    <div class="table-body" ref="tableBodyRef">
+      <el-table
+        ref="tableRef"
+        :data="sortedData"
+        :border="true"
+        :stripe="false"
+        :show-header="false"
+        @selection-change="handleSelectionChange"
+        :row-class-name="tableRowClassName"
+        style="width: 100%"
       >
-        <div
-          v-for="(item, index) in visibleData"
-          :key="item.path || item.name"
-          class="virtual-list-item"
-          :class="{ 'changed-file': item.name !== item.newName }"
+        <el-table-column type="selection" width="55" fixed="left" />
+        <el-table-column width="60" fixed="left">
+          <template #default="scope">
+            {{ scope.$index + 1 }}
+          </template>
+        </el-table-column>
+        <el-table-column 
+          prop="name" 
+          min-width="200"
+          fixed="left"
+        />
+        <el-table-column 
+          prop="newName" 
+          min-width="200"
         >
-          <el-row :gutter="0" align="middle">
-            <el-col :span="1" class="checkbox-cell">
-              <el-checkbox 
-                v-model="selectedFiles" 
-                :value="item"
-                @change="(val) => handleSelectionChange(val, item)"
-              />
-            </el-col>
-            <el-col :span="1" class="index-cell">{{ visibleRange.start + index + 1 }}</el-col>
-            <!-- 目录列 -->
-            <template v-if="showPath">
-              <el-col :span="6" class="directory-cell">
-                <el-tooltip 
-                  :content="getDirectory(item)"
-                  placement="top"
-                  :show-after="500"
-                >
-                  <span class="ellipsis-text">{{ getDirectory(item) }}</span>
-                </el-tooltip>
-              </el-col>
-            </template>
-            <el-col :span="showPath ? 5 : 8" class="filename-cell">
-              <el-tooltip 
-                :content="getFileName(item)"
-                placement="top"
-                :show-after="500"
-              >
-                <span class="ellipsis-text">{{ getFileName(item) }}</span>
-              </el-tooltip>
-            </el-col>
-            <el-col :span="showPath ? 5 : 8" class="new-filename-cell">
-              <el-tooltip 
-                :content="item.newName || item.name"
-                placement="top"
-                :show-after="500"
-              >
-                <span class="ellipsis-text" :class="{ 'changed-name': item.name !== item.newName }">
-                  {{ item.newName || item.name }}
-                </span>
-              </el-tooltip>
-            </el-col>
-            
-            <el-col :span="2" class="size-cell">
-              {{ formatFileSize(item.size) }}
-            </el-col>
-            <el-col :span="4" class="date-cell">
-              {{ formatDate(item.lastModified) }}
-            </el-col>
-          </el-row>
-        </div>
-      </div>
+          <template #default="{ row }">
+            <span :class="{ 'changed-name': row.name !== row.newName }">
+              {{ row.newName }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column 
+          v-if="showPath"
+          prop="path" 
+          min-width="150"
+        >
+          <template #default="{ row }">
+            <el-tooltip 
+              :content="row.path" 
+              placement="top" 
+              :show-after="500"
+            >
+              <span class="ellipsis-text">{{ row.path }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column 
+          prop="size" 
+          width="120"
+        >
+          <template #default="{ row }">
+            {{ formatFileSize(row.size) }}
+          </template>
+        </el-table-column>
+        <el-table-column 
+          prop="lastModified" 
+          width="180"
+        >
+          <template #default="{ row }">
+            {{ formatDate(row.lastModified) }}
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+    
+    <!-- 加载提示 -->
+    <div v-if="isLoading" class="loading-tip">
+      加载中...
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineExpose } from 'vue'
 import { formatFileSize, formatDate } from '@/utils/file'
 import type { ProcessedFile } from '@/types/files'
-import { ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   items: ProcessedFile[]
   itemHeight: number
   bufferSize: number
-  showPath?: boolean
-  sortConfig?: {
+  showPath: boolean
+  sortConfig: {
     prop: string
     order: 'ascending' | 'descending' | null
   }
+  showAffectedOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -219,261 +151,503 @@ const emit = defineEmits<{
   (e: 'sort-change', config: { prop: string; order: string }): void
 }>()
 
-// 视口相关状态
-const containerRef = ref<HTMLElement | null>(null)
-const scrollTop = ref(0)
-const viewportHeight = ref(0)
-const selectedFiles = ref<ProcessedFile[]>([])
+const tableRef = ref()
+const currentData = ref<ProcessedFile[]>([])
+const isLoading = ref(false)
+const pageSize = 200
+const tableBodyRef = ref<HTMLElement>()
+const headerTableRef = ref()
+const isAllSelected = ref(false)
+const isIndeterminate = ref(false)
+const selectedRows = ref<ProcessedFile[]>([])
 
-// 计算总高度
-const totalHeight = computed(() => {
-  return props.items.length * props.itemHeight
+// 修改排序后的数据计算属性
+const sortedData = computed(() => {
+  // 首先根据是否只显示受影响文件筛选数据
+  let filteredData = props.showAffectedOnly 
+    ? currentData.value.filter(item => item.name !== item.newName)
+    : currentData.value
+
+  if (!props.sortConfig.prop || !props.sortConfig.order) {
+    return filteredData
+  }
+
+  return [...filteredData].sort((a, b) => {
+    const prop = props.sortConfig.prop as keyof ProcessedFile
+    const aValue = a[prop]
+    const bValue = b[prop]
+
+    if (props.sortConfig.order === 'ascending') {
+      return aValue > bValue ? 1 : -1
+    } else {
+      return aValue < bValue ? 1 : -1
+    }
+  })
 })
 
-// 计算可见范围
-const visibleRange = computed(() => {
-  const start = Math.floor(scrollTop.value / props.itemHeight)
-  const visibleCount = Math.ceil(viewportHeight.value / props.itemHeight)
-  const bufferCount = Math.ceil(props.bufferSize / 2)
+// 修改初始化加载数据方法
+const initData = () => {
+  // 根据是否只显示受影响文件筛选数据
+  const filteredItems = props.showAffectedOnly 
+    ? props.items.filter(item => item.name !== item.newName)
+    : props.items
+    
+  currentData.value = filteredItems.slice(0, pageSize)
   
-  return {
-    start: Math.max(0, start - bufferCount),
-    end: Math.min(props.items.length, start + visibleCount + bufferCount)
+  console.log('%c[虚拟列表] 初始化数据', 'color: #4CAF50; font-weight: bold;', {
+    显示数据量: currentData.value.length,
+    总数据量: filteredItems.length,
+    仅显示受影响: props.showAffectedOnly
+  })
+  
+  // 初始化后添加滚动监听
+  nextTick(() => {
+    setupScrollListener()
+    // 强制表格重新布局
+    if (tableRef.value) {
+      tableRef.value.doLayout()
+    }
+  })
+}
+
+// 修改获取滚动容器的方法
+const getTableWrapper = () => {
+  return tableBodyRef.value
+}
+
+// 设置滚动监听
+const setupScrollListener = () => {
+  const wrapper = getTableWrapper()
+  if (wrapper) {
+    // 移除可能存在的旧监听器
+    wrapper.removeEventListener('scroll', handleScroll)
+    // 添加新的监听器
+    wrapper.addEventListener('scroll', handleScroll, { passive: true })
+    
+    // 强制设置内容高度
+    const tableBody = wrapper.querySelector('.el-table__body')
+    if (tableBody) {
+      tableBody.style.minHeight = `${currentData.value.length * 40 + 1}px`
+    }
+    
+    nextTick(() => {
+      console.log('%c[虚拟列表] 滚动容器信息', 'color: #9C27B0; font-weight: bold;', {
+        容器高度: wrapper.clientHeight,
+        内容高度: wrapper.scrollHeight,
+        是否可滚动: wrapper.scrollHeight > wrapper.clientHeight,
+        当前数据行数: currentData.value.length,
+        表格body高度: tableBody?.offsetHeight
+      })
+    })
   }
-})
+}
 
-// 计算可见数据
-const visibleData = computed(() => {
-  return props.items.slice(visibleRange.value.start, visibleRange.value.end)
-})
+// 处理滚动事件
+const handleScroll = (event: Event) => {
+  const target = event.target as HTMLElement
+  if (!target || isLoading.value) return
 
-// 计算起始偏移
-const startOffset = computed(() => {
-  return visibleRange.value.start * props.itemHeight
-})
+  const { scrollTop, clientHeight, scrollHeight } = target
+  const scrollBottom = scrollTop + clientHeight
+  const threshold = clientHeight * 0.2 // 当距离底部20%时开始加载
 
-// 处理滚动
-const handleScroll = () => {
-  if (containerRef.value) {
-    scrollTop.value = containerRef.value.scrollTop
+  console.log('%c[虚拟列表] 滚动事件触发', 'color: #FF9800; font-weight: bold;', {
+    滚动位置: scrollTop,
+    可视区域高度: clientHeight,
+    内容总高度: scrollHeight,
+    距离底部: scrollHeight - scrollBottom,
+    触发阈值: threshold,
+    当前数据量: currentData.value.length,
+    是否正在加载: isLoading.value,
+    是否应该加载更多: (scrollHeight - scrollBottom) <= threshold
+  })
+
+  if (scrollHeight - scrollBottom <= threshold) {
+    console.log('%c[虚拟列表] 触发加载更多', 'color: #FF9800; font-weight: bold;')
+    loadMoreData()
   }
+}
+
+// 修改加载更多数据方法
+const loadMoreData = () => {
+  console.log('%c[虚拟列表] 开始加载更多', 'color: #2196F3; font-weight: bold;', {
+    当前加载状态: isLoading.value,
+    当前数据量: currentData.value.length,
+    总数据量: props.items.length
+  })
+
+  if (isLoading.value) return
+  
+  const currentLength = currentData.value.length
+  if (currentLength >= props.items.length) {
+    console.log('%c[虚拟列表] 已加载全部数据', 'color: #F44336; font-weight: bold;')
+    return
+  }
+  
+  isLoading.value = true
+  
+  // 根据是否只显示受影响文件筛选数据
+  const filteredItems = props.showAffectedOnly 
+    ? props.items.filter(item => item.name !== item.newName)
+    : props.items
+    
+  // 模拟异步加载
+  setTimeout(() => {
+    const nextData = filteredItems.slice(
+      currentLength,
+      currentLength + pageSize
+    )
+    
+    currentData.value = [...currentData.value, ...nextData]
+    
+    console.log('%c[虚拟列表] 加载完成', 'color: #2196F3; font-weight: bold;', {
+      当前数据量: currentData.value.length,
+      新增数据量: nextData.length,
+      总数据量: props.items.length,
+      剩余数据量: props.items.length - currentData.value.length
+    })
+    
+    isLoading.value = false
+
+    // 检查是否需要继续加载
+    nextTick(() => {
+      const wrapper = getTableWrapper()
+      if (wrapper) {
+        const { scrollTop, clientHeight, scrollHeight } = wrapper
+        if (scrollHeight - (scrollTop + clientHeight) <= clientHeight * 0.2) {
+          loadMoreData()
+        }
+      }
+    })
+  }, 100)
+}
+
+// 表格行的类名
+const tableRowClassName = ({ row, rowIndex }: { row: ProcessedFile; rowIndex: number }) => {
+  if (row.name !== row.newName) {
+    return rowIndex % 2 === 0 ? 'changed-row even-row' : 'changed-row odd-row'
+  }
+  return ''
+}
+
+// 处理排序变化
+const handleSortChange = (column: { prop: string; order: string }) => {
+  emit('sort-change', column)
+}
+
+// 处理全选
+const handleSelectAll = () => {
+  // 先清空当前选择
+  if (tableRef.value) {
+    tableRef.value.clearSelection()
+  }
+  
+  // 将所有数据加载到当前数据中
+  currentData.value = [...props.items]
+  
+  // 在下一个tick中执行全选
+  nextTick(() => {
+    if (tableRef.value) {
+      tableRef.value.toggleAllSelection()
+    }
+    
+    // 触发选择变化事件，传递所有数据
+    emit('selection-change', props.items)
+  })
+}
+
+// 处理单行选择
+const handleRowSelect = (val: boolean, row: ProcessedFile) => {
+  row.isSelected = val
+  
+  // 计算选中的行数
+  const selectedCount = sortedData.value.filter(r => r.isSelected).length
+  const total = sortedData.value.length
+  
+  // 更新全选和半选状态
+  isAllSelected.value = selectedCount === total
+  isIndeterminate.value = selectedCount > 0 && selectedCount < total
+  
+  // 触发选择变化事件
+  emit('selection-change', sortedData.value.filter(r => r.isSelected))
 }
 
 // 处理选择变化
-const handleSelectionChange = (val: boolean, item: ProcessedFile) => {
-  if (val) {
-    selectedFiles.value.push(item)
-  } else {
-    const index = selectedFiles.value.findIndex(f => f.name === item.name)
-    if (index !== -1) {
-      selectedFiles.value.splice(index, 1)
-    }
-  }
-  emit('selection-change', selectedFiles.value)
+const handleSelectionChange = (selection: ProcessedFile[]) => {
+  selectedRows.value = selection
+  const total = sortedData.value.length
+  isAllSelected.value = selection.length === total
+  isIndeterminate.value = selection.length > 0 && selection.length < total
+  emit('selection-change', selection)
 }
 
-// 获取目录路径
-const getDirectory = (file: ProcessedFile) => {
-  console.log('处理目录显示的文件信息:', file)
-  return file.directory || file.path || ''
-}
-
-// 获取文件名（不含路径）
-const getFileName = (file: ProcessedFile) => {
-  return file.name
-}
-
-// 初始化视口高度
-onMounted(() => {
-  if (containerRef.value) {
-    viewportHeight.value = containerRef.value.clientHeight
-    
-    // 监听容器大小变化
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        viewportHeight.value = entry.contentRect.height
-      }
-    })
-    
-    resizeObserver.observe(containerRef.value)
-  }
-})
-
-// 监听数据变化，重置滚动位置
+// 监听数据变化，重置选择状态
 watch(() => props.items, () => {
-  scrollTop.value = 0
-  if (containerRef.value) {
-    containerRef.value.scrollTop = 0
-  }
+  isAllSelected.value = false
+  isIndeterminate.value = false
+  
+  // 重置每一行的选中状态
+  sortedData.value.forEach(row => {
+    row.isSelected = false
+  })
 }, { deep: true })
 
-// 全选相关
-const isAllSelected = computed(() => {
-  return selectedFiles.value.length === props.items.length
-})
-
-const isIndeterminate = computed(() => {
-  return selectedFiles.value.length > 0 && selectedFiles.value.length < props.items.length
-})
-
-const handleSelectAll = (val: boolean) => {
-  selectedFiles.value = val ? [...props.items] : []
-  emit('selection-change', selectedFiles.value)
-}
-
-// 排序处理
-const handleSort = (prop: string) => {
-  let order: 'ascending' | 'descending' | null = 'ascending'
-  
-  if (props.sortConfig?.prop === prop) {
-    if (props.sortConfig.order === 'ascending') {
-      order = 'descending'
-    } else if (props.sortConfig.order === 'descending') {
-      order = null
-    }
+// 监听数据源变化
+watch(() => props.items, () => {
+  console.log('%c[虚拟列表] 数据源变化', 'color: #E91E63; font-weight: bold;')
+  const wrapper = getTableWrapper()
+  if (wrapper) {
+    wrapper.removeEventListener('scroll', handleScroll)
   }
   
-  emit('sort-change', { prop, order })
+  currentData.value = []
+  nextTick(() => {
+    initData()
+  })
+}, { deep: true })
+
+// 监听 showPath 变化
+watch(() => props.showPath, () => {
+  nextTick(() => {
+    // 延迟更新表格布局
+    setTimeout(() => {
+      if (tableRef.value) {
+        tableRef.value.doLayout()
+      }
+      if (headerTableRef.value) {
+        headerTableRef.value.doLayout()
+      }
+    }, 100)
+  })
+})
+
+// 添加对 showAffectedOnly 的监听
+watch(() => props.showAffectedOnly, () => {
+  console.log('%c[虚拟列表] 切换显示模式', 'color: #E91E63; font-weight: bold;')
+  const wrapper = getTableWrapper()
+  if (wrapper) {
+    wrapper.scrollTop = 0
+    wrapper.removeEventListener('scroll', handleScroll)
+  }
+  
+  currentData.value = []
+  nextTick(() => {
+    initData()
+  })
+})
+
+// 组件挂载时初始化
+onMounted(() => {
+  console.log('%c[虚拟列表] 组件挂载', 'color: #E91E63; font-weight: bold;')
+  initData()
+  nextTick(() => {
+    if (headerTableRef.value && tableRef.value) {
+      const headerTable = headerTableRef.value.$el
+      const bodyTable = tableRef.value.$el
+      const resizeObserver = new ResizeObserver(() => {
+        const headerCols = headerTable.querySelectorAll('.el-table__header col')
+        const bodyCols = bodyTable.querySelectorAll('.el-table__body col')
+        headerCols.forEach((col: HTMLElement, index: number) => {
+          if (bodyCols[index]) {
+            bodyCols[index].width = col.width
+          }
+        })
+      })
+      resizeObserver.observe(headerTable)
+    }
+  })
+})
+
+// 组件卸载时清理
+onUnmounted(() => {
+  console.log('%c[虚拟列表] 组件卸载', 'color: #E91E63; font-weight: bold;')
+  const wrapper = getTableWrapper()
+  if (wrapper) {
+    wrapper.removeEventListener('scroll', handleScroll)
+  }
+})
+
+// 全选方法
+const selectAll = () => {
+  // 先清空当前选择
+  if (tableRef.value) {
+    tableRef.value.clearSelection()
+  }
+  
+  // 将所有数据加载到当前数据中
+  currentData.value = [...props.items]
+  
+  // 在下一个tick中执行全选
+  nextTick(() => {
+    if (tableRef.value) {
+      tableRef.value.toggleAllSelection()
+    }
+    
+    // 触发选择变化事件，传递所有数据
+    emit('selection-change', props.items)
+  })
 }
+
+// 正确暴露方法
+defineExpose({
+  selectAll
+})
 </script>
 
 <style scoped>
-.virtual-list-wrapper {
-  height: 100%;
+.virtual-list {
+  height: 400px;
   position: relative;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-  font-size: 13px;
+  border: 1px solid var(--el-border-color-light);
+  display: flex;
+  flex-direction: column;
 }
 
-.virtual-list-header {
+.table-header {
+  flex-shrink: 0;
+  background: var(--el-bg-color);
+  z-index: 10;
+}
+
+.table-header :deep(.el-table__body-wrapper) {
+  display: none;
+}
+
+.table-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  height: calc(100% - 40px);
+}
+
+:deep(.el-table) {
+  border: none !important;
+}
+
+:deep(.el-table__body) {
+  width: 100% !important;
+}
+
+:deep(.el-table__row) {
+  background-color: #ffffff !important;
+}
+
+:deep(.el-table__row:hover) {
+  background-color: var(--el-table-row-hover-bg-color) !important;
+}
+
+:deep(.changed-row) {
+  background-color: var(--el-color-primary-light-9) !important;
+}
+
+/* 确保选中行的样式正确 */
+:deep(.el-table__row.current-row),
+:deep(.el-table__row.hover-row) {
+  background-color: var(--el-table-row-hover-bg-color) !important;
+}
+
+/* 确保表格内容垂直居中 */
+:deep(.el-table__cell) {
+  padding: 8px 0 !important;
+  vertical-align: middle;
+}
+
+.loading-tip {
+  text-align: center;
+  padding: 10px 0;
+  color: #909399;
+  font-size: 14px;
+  position: sticky;
+  bottom: 0;
   background-color: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  padding: 8px 0;
-  font-weight: bold;
-  font-size: 13px;
-}
-
-.checkbox-cell {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.index-header,
-.index-cell {
-  text-align: center;
-}
-
-.header-cell {
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.filename-cell,
-.new-filename-cell {
-  padding: 0 8px;
-}
-
-.size-cell {
-  text-align: right;
-  padding-right: 8px;
-}
-
-.date-cell {
-  text-align: center;
-  padding: 0 4px;
+  z-index: 1;
 }
 
 .ellipsis-text {
-  display: block;
+  display: inline-block;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+:deep(.el-table__empty-block) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0 !important;
+  height: 100% !important;
+}
+
+:deep(.empty-block) {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   width: 100%;
+  text-align: center;
 }
 
-/* 确保所有行高一致 */
-:deep(.el-row) {
-  height: 32px;
+:deep(.empty-text) {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
 }
 
-/* 确保所有列垂直居中 */
-:deep(.el-col) {
+:deep(.el-table__body-wrapper) {
+  min-height: calc(100% - 1px) !important;
+}
+
+:deep(.el-table__inner-wrapper) {
   height: 100%;
-  display: flex;
-  align-items: center;
 }
 
-/* 调整排序图标位置 */
-.sort-indicators {
-  margin-left: 4px;
-  display: inline-flex;
-  flex-direction: column;
-  height: 14px;
+/* 滚动条样式 */
+.table-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.sort-caret {
-  font-size: 11px;
+.table-body::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--el-scrollbar-bg-color);
 }
 
-.changed-name {
+.table-body::-webkit-scrollbar-track {
+  border-radius: 3px;
+  background: var(--el-fill-color-lighter);
+}
+
+/* 确保按钮在列中居中显示 */
+.table-header :deep(.el-button--small) {
+  padding: 4px 8px;
+  font-size: 12px;
+  margin: 0 auto;
+  display: block;
+}
+
+/* 确保单元格内容居中 */
+.table-header :deep(.el-table__cell) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* 变更的奇数行 - 较深的蓝色 */
+:deep(.changed-row.odd-row) {
+  background-color: #ecf5ff !important;
   color: var(--el-color-primary);
-  font-weight: bold;
 }
 
-.changed-file {
-  background-color: var(--el-color-primary-light-9);
+/* 变更的偶数行 - 较浅的蓝色 */
+:deep(.changed-row.even-row) {
+  background-color: #f5f9ff !important;
+  color: var(--el-color-primary);
 }
 
-.virtual-list-container {
-  height: calc(100% - 48px); /* 减去表头高度 */
-  overflow-y: auto;
-  position: relative;
-}
-
-.virtual-list-phantom {
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  z-index: -1;
-}
-
-.virtual-list-content {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  min-height: 100%;
-}
-
-.directory-cell {
-  padding: 0 8px;
-  overflow: hidden;
-}
-
-.directory-cell .ellipsis-text {
-  display: inline-block;
-  width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.filename-cell {
-  padding: 0 8px;
-  overflow: hidden;
-}
-
-.filename-cell .ellipsis-text {
-  display: inline-block;
-  width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* 变更行悬停效果 */
+:deep(.changed-row:hover td) {
+  background-color: #e3effd !important;
 }
 </style> 

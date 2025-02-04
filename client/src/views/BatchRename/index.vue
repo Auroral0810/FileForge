@@ -464,8 +464,15 @@
         </div>
         <div class="selection-actions">
           <el-button 
+            type="primary" 
+            size="default"
+            @click="handleSelectAll"
+          >
+            全选
+          </el-button>
+          <el-button 
             type="danger" 
-            size="normal" 
+            size="default"  
             :disabled="!selectedFiles.length"
             @click="removeSelectedFiles"
           >
@@ -476,11 +483,13 @@
 
       <div class="file-list-container mt-4">
         <VirtualFileList
+          ref="virtualListRef"
           :items="tableData"
           :item-height="CONFIG.ITEM_HEIGHT"
           :buffer-size="CONFIG.BUFFER_SIZE"
           :show-path="showPath"
           :sort-config="sortConfig"
+          :show-affected-only="previewMode === 'affected'"
           @selection-change="handleSelectionChange"
           @sort-change="handleSortChange"
           style="height: 400px"
@@ -942,41 +951,7 @@ const filterForm = ref<FilterCondition>({
   sizeUnit: 'MB'
 })
 
-const tableData = computed(() => {
-  let files = filteredFileList.value || []
-  
-  // 根据预览模式筛选
-  if (previewMode.value === 'affected') {
-    files = files.filter(file => file.name !== file.newName)
-  }
-
-  // 排序处理
-  if (sortConfig.value.prop && sortConfig.value.order) {
-    files = [...files].sort((a, b) => {
-      const prop = sortConfig.value.prop
-      let aValue = a[prop]
-      let bValue = b[prop]
-
-      // 特殊字段处理
-      if (prop === 'size') {
-        aValue = Number(a.size)
-        bValue = Number(b.size)
-      } else if (prop === 'lastModified') {
-        aValue = Number(a.lastModified)
-        bValue = Number(b.lastModified)
-      } else {
-        aValue = String(aValue).toLowerCase()
-        bValue = String(bValue).toLowerCase()
-      }
-
-      return sortConfig.value.order === 'ascending'
-        ? aValue > bValue ? 1 : -1
-        : aValue < bValue ? 1 : -1
-    })
-  }
-
-  return files
-})
+const tableData = ref<ProcessedFile[]>([])
 
 const hasFiles = computed(() => fileStore.files?.length > 0)
 const hasFilteredFiles = computed(() => filteredFileList.value?.length > 0)
@@ -1182,27 +1157,60 @@ const handleFiles = async (files: FileWithHandle[]) => {
   isProcessingSelected.value = false
 }
 
-const handleSelectionChange = (files: ProcessedFile[]) => {
-  selectedFiles.value = files
+const handleSelectionChange = (selection: ProcessedFile[]) => {
+  console.log('选择变化:', selection) // 添加日志查看选择变化
+  selectedFiles.value = selection
 }
 
 const removeSelectedFiles = () => {
-  const selectedNames = selectedFiles.value.map(file => file.name)
-  const remainingFiles = fileStore.files.filter(file => !selectedNames.includes(file.name))
-  fileStore.$patch({
-    files: remainingFiles
+  if (!selectedFiles.value.length) return
+  
+  // 先保存选中的文件数量
+  const deletedCount = selectedFiles.value.length
+  
+  // 从文件存储中移除选中的文件
+  const remainingFiles = fileStore.files.filter(file => {
+    return !selectedFiles.value.some(selected => 
+      selected.name === file.name && selected.path === file.path
+    )
   })
+  
+  fileStore.$patch({ files: remainingFiles })
+  
+  // 清空选中状态
   selectedFiles.value = []
-  isProcessingSelected.value = false
+  
+  // 刷新文件列表
+  refreshFileList()
+  
+  // 使用保存的数量显示消息
+  ElMessage.success(`已排除${deletedCount} 个文件`)
 }
 
 watch(() => fileStore.files, (newFiles) => {
-  if (newFiles?.length) {
-    refreshFileList()
-  } else {
-    filteredFileList.value = []
+  // 确保所有文件都被加载到表格中
+  const processor = new RenameProcessor(processForm.value as RenameProcessForm)
+  
+  let files = [...newFiles]
+  if (activeFilters.value?.length) {
+    files = files.filter(file => {
+      return activeFilters.value.every(filter => {
+        if (!filter) return true
+        const matchesFilter = applyFilter(file, filter)
+        return filter.type === 'include' ? matchesFilter : !matchesFilter
+      })
+    })
   }
-}, { immediate: true, deep: true })
+
+  // 更新过滤后的文件列表
+  filteredFileList.value = files.map((file, index) => ({
+    ...file,
+    newName: processor.processFileName(file.name, index)
+  })) as ProcessedFile[]
+
+  // 更新表格数据
+  tableData.value = filteredFileList.value
+}, { deep: true, immediate: true })
 
 watch([processForm, activeFilters], () => {
   nextTick(refreshFileList)
@@ -1459,11 +1467,11 @@ const updateProcessMetrics = () => {
 
 // 将所有配置常量统一放在文件顶部
 const CONFIG = {
-  BATCH_SIZE: 200,
-  VISIBLE_ITEMS: 30,
-  BATCH_DELAY: 10,
-  BUFFER_SIZE: 5,
-  ITEM_HEIGHT: 40
+  BATCH_SIZE: 200,    // 批处理数据大小
+  VISIBLE_ITEMS: 30,  // 可视区域显示的行数
+  BATCH_DELAY: 10,    // 批处理延迟时间(ms)
+  BUFFER_SIZE: 5,     // 缓冲区大小(额外渲染的行数)
+  ITEM_HEIGHT: 40     // 每行高度(px)
 } as const;
 
 // 创建 Worker 实例
@@ -1722,10 +1730,11 @@ const removeFilter = (index: number) => {
   })
 }
 
-// 修改 refreshFileList 方法
+// 修改 refreshFileList 函数
 function refreshFileList() {
   if (!fileStore.files?.length) {
     filteredFileList.value = []
+    tableData.value = []
     return
   }
 
@@ -1736,20 +1745,20 @@ function refreshFileList() {
     files = files.filter(file => {
       return activeFilters.value.every(filter => {
         if (!filter) return true
-        
-        // 获取过滤结果
         const matchesFilter = applyFilter(file, filter)
-        
-        // 根据 type 决定是包含还是排除
         return filter.type === 'include' ? matchesFilter : !matchesFilter
       })
     })
   }
 
+  // 更新过滤后的文件列表
   filteredFileList.value = files.map((file, index) => ({
     ...file,
     newName: processor.processFileName(file.name, index)
   })) as ProcessedFile[]
+
+  // 更新表格数据
+  tableData.value = filteredFileList.value
 }
 
 // 过滤器应用函数
@@ -2060,11 +2069,6 @@ onUnmounted(() => {
   worker.terminate();
 });
 
-// 监听文件存储的变化
-watch(() => fileStore.files, (newFiles) => {
-  tableData.value = newFiles
-}, { deep: true, immediate: true })
-
 // 处理文件选择
 const handleFilesSelected = async (files: File[]) => {
   // 处理文件上传
@@ -2083,6 +2087,15 @@ const currentRules = ref([
     caseSensitive: false
   }
 ])
+
+const virtualListRef = ref() // 添加对VirtualFileList组件的引用
+
+// 处理全选
+const handleSelectAll = () => {
+  if (virtualListRef.value) {
+    virtualListRef.value.selectAll()
+  }
+}
 </script>
 
 <style scoped>
