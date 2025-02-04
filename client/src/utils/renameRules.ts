@@ -401,18 +401,15 @@ export class RenameProcessor {
     }
   }
 
-  private processNewName(fileName: string, index: number): string {
+  private processNewName(fileName: string, index: number, lastModified?: number): string {
     const { template, processExt } = this.rules.newName
     const fileExt = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.') + 1) : ''
     
-    // 获取文件的最后修改时间
-    const lastModified = new Date(fileName.lastModified || Date.now()).getTime()
-
     const newName = processTemplate(template, {
       fileName,
       fileExt,
       index,
-      lastModified
+      lastModified: lastModified || Date.now()
     })
 
     // 如果不处理扩展名，则添加原始扩展名

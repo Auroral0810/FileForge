@@ -129,21 +129,8 @@
           </el-breadcrumb>
         </el-header>
 
-        <el-main class="animate__animated animate__fadeIn animate__delay-1s">
-          <router-view v-slot="{ Component }">
-            <transition 
-              name="fade-transform" 
-              mode="out-in"
-              @before-enter="handleBeforeEnter"
-              @after-leave="handleAfterLeave"
-            >
-              <component 
-                :is="Component" 
-                :key="$route.fullPath"
-                class="animate__animated animate__fadeIn"
-              />
-            </transition>
-          </router-view>
+        <el-main>
+          <router-view />
         </el-main>
       </el-container>
     </el-container>
@@ -151,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -173,23 +160,11 @@ const handleMenuLeave = () => {
   activeSubmenu.value = ''
 }
 
-const handleBeforeEnter = () => {
-  nextTick(() => {
-    document.documentElement.scrollTop = 0
-  })
-}
-
-const handleAfterLeave = () => {
-  const elements = document.querySelectorAll('.animate__animated')
-  elements.forEach(el => {
-    el.classList.remove('animate__fadeIn', 'animate__delay-1s')
-  })
-}
-
 const handleMenuClick = async (path: string) => {
-  handleAfterLeave()
-  await nextTick()
-  router.push(path)
+  if (router.currentRoute.value.path === path) {
+    return
+  }
+  await router.push(path)
 }
 </script>
 
@@ -276,14 +251,14 @@ const handleMenuClick = async (path: string) => {
 }
 
 .el-main {
-  position: relative;
-  overflow-x: hidden;
   padding: 20px;
+  overflow-x: hidden;
+  height: calc(100vh - 60px); /* 减去header高度 */
 }
 
 .main-container {
-  min-height: 100vh;
-  max-height: 105vh;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* 动画相关样式 */
@@ -298,6 +273,12 @@ const handleMenuClick = async (path: string) => {
   }
 }
 
+.page-component {
+  width: 100%;
+  height: 100%;
+}
+
+/* 修改过渡动画样式 */
 .fade-transform-enter-active,
 .fade-transform-leave-active {
   transition: all 0.3s ease-out;
@@ -311,6 +292,17 @@ const handleMenuClick = async (path: string) => {
 .fade-transform-leave-to {
   opacity: 0;
   transform: translateX(-30px);
+}
+
+/* 确保动画元素正确定位 */
+.animate__animated {
+  animation-duration: 0.5s;
+  animation-fill-mode: both;
+}
+
+/* 优化动画性能 */
+.animate__fadeIn {
+  will-change: opacity, transform;
 }
 
 /* 添加滚动条样式 */

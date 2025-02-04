@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
-import type { ProcessedFile } from '@/types/files'
+import type { FileWithHandle } from '@/types/files'
 
 export const useFileStore = defineStore('file', {
   state: () => ({
-    files: [] as ProcessedFile[]
+    files: [] as FileWithHandle[]
   }),
 
   getters: {
@@ -13,7 +13,7 @@ export const useFileStore = defineStore('file', {
         name: file.name,
         newName: file.newName,
         path: file.path,
-        directory: file.directory,
+        directory: file.path.split('/').slice(0, -1).join('/'),
         size: file.size,
         lastModified: file.lastModified,
         type: file.type
@@ -22,28 +22,26 @@ export const useFileStore = defineStore('file', {
   },
 
   actions: {
-    async addFiles(files: File[]) {
-      const processedFiles: ProcessedFile[] = files.map(file => ({
-        name: file.name,
-        newName: file.name,
-        path: file.path || '',
-        directory: file.path || '',
-        size: file.size,
-        lastModified: file.lastModified,
-        type: file.type
-      }))
-
-      this.files = [...this.files, ...processedFiles]
+    addFiles(newFiles: FileWithHandle[]) {
+      this.files.push(...newFiles)
     },
 
     clearFiles() {
       this.files = []
     },
 
-    updateFileName(index: number, newName: string) {
-      if (this.files[index]) {
-        this.files[index].newName = newName
-      }
+    updateFiles(renamedFiles: Array<{ oldName: string, newName: string, path: string }>) {
+      renamedFiles.forEach(({ oldName, newName, path }) => {
+        const fileIndex = this.files.findIndex(f => 
+          f.name === oldName && f.path === path
+        )
+        if (fileIndex !== -1) {
+          this.files[fileIndex] = {
+            ...this.files[fileIndex],
+            name: newName
+          }
+        }
+      })
     }
   }
 }) 

@@ -1,5 +1,6 @@
 import { RenameProcessor } from './renameRules'
 import type { ProcessForm, FileWithHandle } from '@/types/files'
+import type { ProcessForm as RenameProcessForm } from './renameRules'
 
 export const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 B'
@@ -76,14 +77,8 @@ export const processFileName = (
   rules: ProcessForm,
   fileIndex: number
 ): string => {
-  // 创建 RenameProcessor 实例
-  const processor = new RenameProcessor(rules)
-  
-  // 使用 RenameProcessor 处理文件名，传入文件索引
-  const newName = processor.processFileName(file.name, fileIndex)
-  
-  // 确保返回新的文件名
-  return newName
+  const processor = new RenameProcessor(rules as RenameProcessForm)
+  return processor.processFileName(file.name, fileIndex)
 }
 
 // 批量处理文件

@@ -1,130 +1,159 @@
 <template>
   <div class="virtual-list">
-    <!-- 固定表头 -->
-    <div class="table-header">
-      <el-table
-        :data="[{}]"
-        :border="true"
-        style="width: 100%"
-        ref="headerTableRef"
-        @sort-change="handleSortChange"
-      >
-        <el-table-column width="55" fixed="left">
-          <template #default>
-            <el-button 
-              size="small"
-              @click="handleSelectAll"
-            >
-              全选
-            </el-button>
-          </template>
-        </el-table-column>
-        <el-table-column label="序号" width="60" fixed="left" />
-        <el-table-column 
-          prop="name" 
-          label="原文件名" 
-          sortable="custom"
-          min-width="200"
-          fixed="left"
-        />
-        <el-table-column 
-          prop="newName" 
-          label="新文件名" 
-          sortable="custom"
-          min-width="200"
-        />
-        <el-table-column 
-          v-if="showPath"
-          prop="path" 
-          label="目录" 
-          sortable="custom"
-          min-width="150"
-        />
-        <el-table-column 
-          prop="size" 
-          label="大小" 
-          sortable="custom"
-          width="120"
-        />
-        <el-table-column 
-          prop="lastModified" 
-          label="修改时间"
-          sortable="custom" 
-          width="180"
-        />
-      </el-table>
-    </div>
+    <!-- 当没有数据时显示的完整表格 -->
+    <el-table
+      v-if="!hasData"
+      :data="[]"
+      :border="true"
+      style="width: 100%; height: 100%"
+      ref="emptyTableRef"
+    >
+      <el-table-column width="55" fixed="left">
+        <template #default>
+          <el-button size="small" disabled>全选</el-button>
+        </template>
+      </el-table-column>
+      <el-table-column label="序号" width="60" fixed="left" />
+      <el-table-column prop="name" label="原文件名" min-width="200" fixed="left" />
+      <el-table-column prop="newName" label="新文件名" min-width="200" />
+      <el-table-column v-if="showPath" prop="path" label="目录" min-width="150" />
+      <el-table-column prop="size" label="大小" width="120" />
+      <el-table-column prop="lastModified" label="修改时间" width="180" />
+      <template #empty>
+        <div class="custom-empty">
+          <span>没有要处理的文件</span>
+        </div>
+      </template>
+    </el-table>
 
-    <!-- 可滚动的表格主体 -->
-    <div class="table-body" ref="tableBodyRef">
-      <el-table
-        ref="tableRef"
-        :data="sortedData"
-        :border="true"
-        :stripe="false"
-        :show-header="false"
-        @selection-change="handleSelectionChange"
-        :row-class-name="tableRowClassName"
-        style="width: 100%"
-      >
-        <el-table-column type="selection" width="55" fixed="left" />
-        <el-table-column width="60" fixed="left">
-          <template #default="scope">
-            {{ scope.$index + 1 }}
-          </template>
-        </el-table-column>
-        <el-table-column 
-          prop="name" 
-          min-width="200"
-          fixed="left"
-        />
-        <el-table-column 
-          prop="newName" 
-          min-width="200"
+    <!-- 有数据时显示的分离式表格结构 -->
+    <template v-else>
+      <!-- 固定表头 -->
+      <div class="table-header">
+        <el-table
+          :data="[{}]"
+          :border="true"
+          style="width: 100%"
+          ref="headerTableRef"
+          @sort-change="handleSortChange"
         >
-          <template #default="{ row }">
-            <span :class="{ 'changed-name': row.name !== row.newName }">
-              {{ row.newName }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column 
-          v-if="showPath"
-          prop="path" 
-          min-width="150"
+          <el-table-column width="55" fixed="left">
+            <template #default>
+              <el-button 
+                size="small"
+                @click="handleSelectAll"
+              >
+                全选
+              </el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="序号" width="60" fixed="left" />
+          <el-table-column 
+            prop="name" 
+            label="原文件名" 
+            sortable="custom"
+            min-width="200"
+            fixed="left"
+          />
+          <el-table-column 
+            prop="newName" 
+            label="新文件名" 
+            sortable="custom"
+            min-width="200"
+          />
+          <el-table-column 
+            v-if="showPath"
+            prop="path" 
+            label="目录" 
+            sortable="custom"
+            min-width="150"
+          />
+          <el-table-column 
+            prop="size" 
+            label="大小" 
+            sortable="custom"
+            width="120"
+          />
+          <el-table-column 
+            prop="lastModified" 
+            label="修改时间"
+            sortable="custom" 
+            width="180"
+          />
+        </el-table>
+      </div>
+
+      <!-- 可滚动的表格主体 -->
+      <div class="table-body" ref="tableBodyRef">
+        <el-table
+          ref="tableRef"
+          :data="sortedData"
+          :border="true"
+          :stripe="false"
+          :show-header="false"
+          @selection-change="handleSelectionChange"
+          :row-class-name="tableRowClassName"
+          style="width: 100%"
         >
-          <template #default="{ row }">
-            <el-tooltip 
-              :content="row.path" 
-              placement="top" 
-              :show-after="500"
-            >
-              <span class="ellipsis-text">{{ row.path }}</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-        <el-table-column 
-          prop="size" 
-          width="120"
-        >
-          <template #default="{ row }">
-            {{ formatFileSize(row.size) }}
-          </template>
-        </el-table-column>
-        <el-table-column 
-          prop="lastModified" 
-          width="180"
-        >
-          <template #default="{ row }">
-            {{ formatDate(row.lastModified) }}
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
+          <el-table-column type="selection" width="55" fixed="left" />
+          <el-table-column width="60" fixed="left">
+            <template #default="scope">
+              {{ scope.$index + 1 }}
+            </template>
+          </el-table-column>
+          <el-table-column 
+            prop="name" 
+            min-width="200"
+            fixed="left"
+          />
+          <el-table-column 
+            prop="newName" 
+            min-width="200"
+          >
+            <template #default="{ row }">
+              <span :class="{ 'changed-name': row.name !== row.newName }">
+                {{ row.newName }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column 
+            v-if="showPath"
+            prop="path" 
+            min-width="150"
+          >
+            <template #default="{ row }">
+              <el-tooltip 
+                :content="row.path" 
+                placement="top" 
+                :show-after="500"
+              >
+                <span class="ellipsis-text">{{ row.path }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column 
+            prop="size" 
+            width="120"
+          >
+            <template #default="{ row }">
+              {{ formatFileSize(row.size) }}
+            </template>
+          </el-table-column>
+          <el-table-column 
+            prop="lastModified" 
+            width="180"
+          >
+            <template #default="{ row }">
+              {{ formatDate(row.lastModified) }}
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </template>
     
     <!-- 加载提示 -->
     <div v-if="isLoading" class="loading-tip">
-      加载中...
+      loading...
     </div>
   </div>
 </template>
@@ -147,8 +176,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'selection-change', files: ProcessedFile[]): void
-  (e: 'sort-change', config: { prop: string; order: string }): void
+  'selection-change': [selection: ProcessedFile[]],
+  'sort-change': [config: { prop: string; order: 'ascending' | 'descending' | null }]
 }>()
 
 const tableRef = ref()
@@ -174,8 +203,8 @@ const sortedData = computed(() => {
 
   return [...filteredData].sort((a, b) => {
     const prop = props.sortConfig.prop as keyof ProcessedFile
-    const aValue = a[prop]
-    const bValue = b[prop]
+    const aValue = a[prop] ?? ''
+    const bValue = b[prop] ?? ''
 
     if (props.sortConfig.order === 'ascending') {
       return aValue > bValue ? 1 : -1
@@ -194,11 +223,11 @@ const initData = () => {
     
   currentData.value = filteredItems.slice(0, pageSize)
   
-  console.log('%c[虚拟列表] 初始化数据', 'color: #4CAF50; font-weight: bold;', {
-    显示数据量: currentData.value.length,
-    总数据量: filteredItems.length,
-    仅显示受影响: props.showAffectedOnly
-  })
+  // console.log('%c[虚拟列表] 初始化数据', 'color: #4CAF50; font-weight: bold;', {
+  //   显示数据量: currentData.value.length,
+  //   总数据量: filteredItems.length,
+  //   仅显示受影响: props.showAffectedOnly
+  // })
   
   // 初始化后添加滚动监听
   nextTick(() => {
@@ -227,18 +256,10 @@ const setupScrollListener = () => {
     // 强制设置内容高度
     const tableBody = wrapper.querySelector('.el-table__body')
     if (tableBody) {
-      tableBody.style.minHeight = `${currentData.value.length * 40 + 1}px`
+      (tableBody as HTMLElement).style.minHeight = `${currentData.value.length * 40 + 1}px`
     }
     
-    nextTick(() => {
-      console.log('%c[虚拟列表] 滚动容器信息', 'color: #9C27B0; font-weight: bold;', {
-        容器高度: wrapper.clientHeight,
-        内容高度: wrapper.scrollHeight,
-        是否可滚动: wrapper.scrollHeight > wrapper.clientHeight,
-        当前数据行数: currentData.value.length,
-        表格body高度: tableBody?.offsetHeight
-      })
-    })
+    nextTick(() => {})
   }
 }
 
@@ -249,38 +270,19 @@ const handleScroll = (event: Event) => {
 
   const { scrollTop, clientHeight, scrollHeight } = target
   const scrollBottom = scrollTop + clientHeight
-  const threshold = clientHeight * 0.2 // 当距离底部20%时开始加载
-
-  console.log('%c[虚拟列表] 滚动事件触发', 'color: #FF9800; font-weight: bold;', {
-    滚动位置: scrollTop,
-    可视区域高度: clientHeight,
-    内容总高度: scrollHeight,
-    距离底部: scrollHeight - scrollBottom,
-    触发阈值: threshold,
-    当前数据量: currentData.value.length,
-    是否正在加载: isLoading.value,
-    是否应该加载更多: (scrollHeight - scrollBottom) <= threshold
-  })
-
+  const threshold = clientHeight * 0.3 // 当距离底部30%时开始加载
   if (scrollHeight - scrollBottom <= threshold) {
-    console.log('%c[虚拟列表] 触发加载更多', 'color: #FF9800; font-weight: bold;')
     loadMoreData()
   }
 }
 
 // 修改加载更多数据方法
 const loadMoreData = () => {
-  console.log('%c[虚拟列表] 开始加载更多', 'color: #2196F3; font-weight: bold;', {
-    当前加载状态: isLoading.value,
-    当前数据量: currentData.value.length,
-    总数据量: props.items.length
-  })
 
   if (isLoading.value) return
   
   const currentLength = currentData.value.length
   if (currentLength >= props.items.length) {
-    console.log('%c[虚拟列表] 已加载全部数据', 'color: #F44336; font-weight: bold;')
     return
   }
   
@@ -300,13 +302,6 @@ const loadMoreData = () => {
     
     currentData.value = [...currentData.value, ...nextData]
     
-    console.log('%c[虚拟列表] 加载完成', 'color: #2196F3; font-weight: bold;', {
-      当前数据量: currentData.value.length,
-      新增数据量: nextData.length,
-      总数据量: props.items.length,
-      剩余数据量: props.items.length - currentData.value.length
-    })
-    
     isLoading.value = false
 
     // 检查是否需要继续加载
@@ -314,7 +309,7 @@ const loadMoreData = () => {
       const wrapper = getTableWrapper()
       if (wrapper) {
         const { scrollTop, clientHeight, scrollHeight } = wrapper
-        if (scrollHeight - (scrollTop + clientHeight) <= clientHeight * 0.2) {
+        if (scrollHeight - (scrollTop + clientHeight) <= clientHeight * 0.3) {
           loadMoreData()
         }
       }
@@ -331,7 +326,7 @@ const tableRowClassName = ({ row, rowIndex }: { row: ProcessedFile; rowIndex: nu
 }
 
 // 处理排序变化
-const handleSortChange = (column: { prop: string; order: string }) => {
+const handleSortChange = (column: { prop: string; order: 'ascending' | 'descending' | null }) => {
   emit('sort-change', column)
 }
 
@@ -356,22 +351,6 @@ const handleSelectAll = () => {
   })
 }
 
-// 处理单行选择
-const handleRowSelect = (val: boolean, row: ProcessedFile) => {
-  row.isSelected = val
-  
-  // 计算选中的行数
-  const selectedCount = sortedData.value.filter(r => r.isSelected).length
-  const total = sortedData.value.length
-  
-  // 更新全选和半选状态
-  isAllSelected.value = selectedCount === total
-  isIndeterminate.value = selectedCount > 0 && selectedCount < total
-  
-  // 触发选择变化事件
-  emit('selection-change', sortedData.value.filter(r => r.isSelected))
-}
-
 // 处理选择变化
 const handleSelectionChange = (selection: ProcessedFile[]) => {
   selectedRows.value = selection
@@ -394,7 +373,7 @@ watch(() => props.items, () => {
 
 // 监听数据源变化
 watch(() => props.items, () => {
-  console.log('%c[虚拟列表] 数据源变化', 'color: #E91E63; font-weight: bold;')
+  // console.log('%c[虚拟列表] 数据源变化', 'color: #E91E63; font-weight: bold;')
   const wrapper = getTableWrapper()
   if (wrapper) {
     wrapper.removeEventListener('scroll', handleScroll)
@@ -423,7 +402,7 @@ watch(() => props.showPath, () => {
 
 // 添加对 showAffectedOnly 的监听
 watch(() => props.showAffectedOnly, () => {
-  console.log('%c[虚拟列表] 切换显示模式', 'color: #E91E63; font-weight: bold;')
+  // console.log('%c[虚拟列表] 切换显示模式', 'color: #E91E63; font-weight: bold;')
   const wrapper = getTableWrapper()
   if (wrapper) {
     wrapper.scrollTop = 0
@@ -438,7 +417,7 @@ watch(() => props.showAffectedOnly, () => {
 
 // 组件挂载时初始化
 onMounted(() => {
-  console.log('%c[虚拟列表] 组件挂载', 'color: #E91E63; font-weight: bold;')
+  // console.log('%c[虚拟列表] 组件挂载', 'color: #E91E63; font-weight: bold;')
   initData()
   nextTick(() => {
     if (headerTableRef.value && tableRef.value) {
@@ -449,7 +428,7 @@ onMounted(() => {
         const bodyCols = bodyTable.querySelectorAll('.el-table__body col')
         headerCols.forEach((col: HTMLElement, index: number) => {
           if (bodyCols[index]) {
-            bodyCols[index].width = col.width
+            (bodyCols[index] as HTMLTableColElement).width = (col as HTMLTableColElement).width
           }
         })
       })
@@ -460,7 +439,7 @@ onMounted(() => {
 
 // 组件卸载时清理
 onUnmounted(() => {
-  console.log('%c[虚拟列表] 组件卸载', 'color: #E91E63; font-weight: bold;')
+  // console.log('%c[虚拟列表] 组件卸载', 'color: #E91E63; font-weight: bold;')
   const wrapper = getTableWrapper()
   if (wrapper) {
     wrapper.removeEventListener('scroll', handleScroll)
@@ -492,6 +471,11 @@ const selectAll = () => {
 defineExpose({
   selectAll
 })
+
+// 添加判断是否有数据的计算属性
+const hasData = computed(() => {
+  return props.items && props.items.length > 0
+})
 </script>
 
 <style scoped>
@@ -518,7 +502,20 @@ defineExpose({
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
-  height: calc(100% - 40px);
+}
+
+/* 确保表格主体正确展示 */
+.table-body :deep(.el-table) {
+  height: auto !important;
+}
+
+.table-body :deep(.el-table__inner-wrapper) {
+  height: auto !important;
+}
+
+.table-body :deep(.el-table__body-wrapper) {
+  height: auto !important;
+  overflow: visible !important;
 }
 
 :deep(.el-table) {
@@ -649,5 +646,29 @@ defineExpose({
 /* 变更行悬停效果 */
 :deep(.changed-row:hover td) {
   background-color: #e3effd !important;
+}
+
+/* 自定义空数据样式 */
+.custom-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+/* 确保空表格填满容器 */
+:deep(.el-table__inner-wrapper),
+:deep(.el-table__body-wrapper) {
+  height: 100% !important;
+}
+
+/* 修改表格边框样式 */
+.virtual-list :deep(.el-table) {
+  height: 100%;
+}
+
+/* 确保空表格的表头正确显示 */
+.virtual-list :deep(.el-table__header-wrapper) {
+  background-color: var(--el-bg-color);
 }
 </style> 

@@ -404,8 +404,16 @@
             </template>
             <el-form :model="processForm.customJS" label-width="120px">
               <el-form-item>
-                <el-checkbox v-model="processForm.customJS.enabled">启用规则</el-checkbox>
-                <el-checkbox v-model="processForm.customJS.processExt" class="ml-4">同时处理后缀名</el-checkbox>
+                <div class="js-header">
+                  <div class="js-checkboxes">
+                    <el-checkbox v-model="processForm.customJS.enabled">启用规则</el-checkbox>
+                    <el-checkbox v-model="processForm.customJS.processExt" class="ml-4">同时处理后缀名</el-checkbox>
+                  </div>
+                  <el-button type="primary" link @click="showJsHelp">
+                    <el-icon><QuestionFilled /></el-icon>
+                    查看使用帮助
+                  </el-button>
+                </div>
               </el-form-item>
               <el-form-item label="自定义代码">
                 <el-input
@@ -557,25 +565,6 @@
         </el-button>
       </div>
     </el-card>
-
-    <!-- 添加进度条对话框 -->
-    <el-dialog
-      v-model="progressVisible"
-      title="重命名进度"
-      :close-on-click-modal="false"
-      :close-on-press-escape="false"
-      :show-close="false"
-      width="400px"
-    >
-      <div class="progress-container">
-        <el-progress
-          :percentage="currentProgress"
-          :format="(percentage) => `${percentage}%`"
-          :status="currentProgress === 100 ? 'success' : ''"
-        />
-        <div class="progress-text">{{ progressText }}</div>
-      </div>
-    </el-dialog>
   </div>
 
   <el-dialog
@@ -841,21 +830,254 @@
       </el-carousel-item>
     </el-carousel>
   </el-dialog>
+
+  <!-- 添加自定义JS帮助对话框 -->
+  <el-dialog
+    v-model="jsHelpVisible"
+    title="自定义JS使用帮助"
+    width="800px"
+    :close-on-click-modal="true"
+    class="js-help-dialog"
+  >
+    <el-carousel 
+      height="600px"
+      indicator-position="outside"
+      :autoplay="false"
+      trigger="click"
+    >
+      <!-- 修改基础介绍轮播页 -->
+      <el-carousel-item>
+        <div class="help-page">
+          <h3 class="page-title">🚀 自定义JS简介</h3>
+          <div class="intro-content">
+            <!-- 功能说明卡片 -->
+            <div class="feature-card">
+              <h4>💡 功能说明</h4>
+              <p>自定义JS是一个强大的重命名工具，它允许您：</p>
+              <ul class="feature-list">
+                <li>✨ 通过编写JavaScript代码实现复杂的重命名逻辑</li>
+                <li>🔄 批量处理多个文件，每个文件独立调用一次</li>
+                <li>📊 访问文件的详细信息（大小、修改时间等）</li>
+                <li>🎯 实现其他重命名规则无法完成的自定义需求</li>
+              </ul>
+            </div>
+
+            <!-- 参数说明卡片 -->
+            <div class="feature-card">
+              <h4>📝 参数说明</h4>
+              <div class="params-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>参数名</th>
+                      <th>类型</th>
+                      <th>说明</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>name</code></td>
+                      <td>string</td>
+                      <td>完整文件名（根据设置可能包含或不包含后缀）</td>
+                    </tr>
+                    <tr>
+                      <td><code>nameWithoutExt</code></td>
+                      <td>string</td>
+                      <td>不含后缀的文件名</td>
+                    </tr>
+                    <tr>
+                      <td><code>extension</code></td>
+                      <td>string</td>
+                      <td>后缀名（包含点，如 ".jpg"）</td>
+                    </tr>
+                    <tr>
+                      <td><code>modifyTime</code></td>
+                      <td>number</td>
+                      <td>文件修改时间（毫秒时间戳）</td>
+                    </tr>
+                    <tr>
+                      <td><code>size</code></td>
+                      <td>number</td>
+                      <td>文件大小（字节）</td>
+                    </tr>
+                    <tr>
+                      <td><code>index</code></td>
+                      <td>number</td>
+                      <td>文件在列表中的序号（从0开始）</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 使用提示卡片 -->
+            <div class="feature-card">
+              <h4>📌 使用提示</h4>
+              <div class="tips-content">
+                <div class="tip-item">
+                  <h5>🎯 返回值说明</h5>
+                  <p>函数必须返回一个字符串作为新文件名：</p>
+                  <ul>
+                    <li>默认情况下返回不含后缀的文件名</li>
+                    <li>勾选"同时处理后缀名"时需返回完整文件名</li>
+                    <li>返回空值或undefined将跳过该文件</li>
+                  </ul>
+                </div>
+                <div class="tip-item">
+                  <h5>⚠️ 注意事项</h5>
+                  <ul>
+                    <li>代码在本地执行，注意文件名合法性</li>
+                    <li>避免使用特殊字符（\ / : * ? " < > |）</li>
+                    <li>建议先使用少量文件测试</li>
+                    <li>可以使用console.log()调试</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- 安全提示卡片 -->
+            <div class="feature-card">
+              <h4>🔒 安全提示</h4>
+              <div class="security-content">
+                <p class="security-warning">
+                  <el-icon><Warning /></el-icon>
+                  所有操作均在本地执行，但请注意：
+                </p>
+                <ul>
+                  <li>请勿运行来源不明的代码</li>
+                  <li>代码应只包含文件名处理逻辑</li>
+                  <li>不建议使用网络请求相关API</li>
+                  <li>使用AI生成的代码时需要仔细检查</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-carousel-item>
+
+      <!-- 基础示例 -->
+      <el-carousel-item>
+        <div class="help-page">
+          <h3 class="page-title">📚 基础示例</h3>
+          <div class="example-section">
+            <div class="example-card">
+              <h4>🔄 转换大小写</h4>
+              <pre class="code-block">
+function rename(options) {
+  const { nameWithoutExt } = options;
+  return nameWithoutExt.toUpperCase();
+}</pre>
+              <div class="example-result">
+                <p>输入：photo.jpg</p>
+                <p>输出：PHOTO.jpg</p>
+              </div>
+            </div>
+            <div class="example-card">
+              <h4>🔢 添加序号</h4>
+              <pre class="code-block">
+function rename(options) {
+  const { nameWithoutExt, index } = options;
+  return `${String(index + 1).padStart(3, '0')}_${nameWithoutExt}`;
+}</pre>
+              <div class="example-result">
+                <p>输入：photo.jpg</p>
+                <p>输出：001_photo.jpg</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-carousel-item>
+
+      <!-- 进阶示例 -->
+      <el-carousel-item>
+        <div class="help-page">
+          <h3 class="page-title">🎯 进阶示例</h3>
+          <div class="example-section">
+            <div class="example-card">
+              <h4>📅 添加日期前缀</h4>
+              <pre class="code-block">
+function rename(options) {
+  const { nameWithoutExt, modifyTime } = options;
+  const date = new Date(modifyTime);
+  const dateStr = date.toISOString().split('T')[0];
+  return `${dateStr}_${nameWithoutExt}`;
+}</pre>
+              <div class="example-result">
+                <p>输入：photo.jpg</p>
+                <p>输出：2024-01-20_photo.jpg</p>
+              </div>
+            </div>
+            <div class="example-card">
+              <h4>📏 文件大小标记</h4>
+              <pre class="code-block">
+function rename(options) {
+  const { nameWithoutExt, size } = options;
+  const sizeInMB = (size / (1024 * 1024)).toFixed(1);
+  return `${nameWithoutExt}_${sizeInMB}MB`;
+}</pre>
+              <div class="example-result">
+                <p>输入：document.pdf</p>
+                <p>输出：document_2.5MB.pdf</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-carousel-item>
+
+      <!-- AI提示使用 -->
+      <el-carousel-item>
+        <div class="help-page">
+          <h3 class="page-title">🤖 AI助手使用指南</h3>
+          <div class="ai-guide">
+            <div class="prompt-template">
+              <h4>💬 AI提示模板</h4>
+              <pre class="code-block">
+我正在使用 javascript 进行文件的批量重命名工作，请帮我完成以下需求：
+
+需求描述：[在这里描述您的需求]
+示例：
+  输入文件名：example.jpg
+  期望输出：[描述期望的输出格式]
+
+函数模板：
+function rename(options) {
+  const {name, nameWithoutExt, extension, modifyTime, size, index} = options;
+  // 请在这里补充代码
+  return name;
+}</pre>
+            </div>
+            <div class="prompt-example">
+              <h4>🌟 示例提示</h4>
+              <div class="example-content">
+                <p>"请帮我写一个重命名函数，要求：</p>
+                <ol>
+                  <li>在文件名前添加三位数序号</li>
+                  <li>添加当前日期作为前缀</li>
+                  <li>所有空格替换为下划线"</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-carousel-item>
+    </el-carousel>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick} from 'vue'
 import { useFileStore } from '@/stores/file'
 import { useHistoryStore } from '@/stores/historyStore'
 import type { FileWithHandle, ProcessedFile, FilterCondition, ProcessForm } from '@/types/files'
 import { RenameProcessor, type ProcessForm as RenameProcessForm } from '@/utils/renameRules'
-import { formatFileSize, formatDate, processRegexRename } from '@/utils/file'
-import { UploadFilled, QuestionFilled, RefreshRight, Delete, Back, Right, Check, ArrowDown } from '@element-plus/icons-vue'
+import { UploadFilled, QuestionFilled, RefreshRight, Delete, Back, Right, Check, ArrowDown, Warning } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import VirtualFileList from '@/components/VirtualFileList.vue'
 
+// 初始化 stores
 const fileStore = useFileStore()
 const historyStore = useHistoryStore()
+
 const filteredFileList = ref<ProcessedFile[]>([])
 const activeFilters = ref<FilterCondition[]>([])
 const previewMode = ref('preview')
@@ -910,7 +1132,7 @@ const processForm = ref<ProcessForm>({
   customJS: {
     enabled: false,
     processExt: false,
-    code: '// 在这里编写处理代码\nreturn fileName;'
+    code: ''
   }
 })
 
@@ -1158,7 +1380,7 @@ const handleFiles = async (files: FileWithHandle[]) => {
 }
 
 const handleSelectionChange = (selection: ProcessedFile[]) => {
-  console.log('选择变化:', selection) // 添加日志查看选择变化
+  // console.log('选择变化:', selection) // 添加日志查看选择变化
   selectedFiles.value = selection
 }
 
@@ -1426,6 +1648,8 @@ const totalFiles = ref(0)
 const processSpeed = ref('0.00')
 const remainingTime = ref('计算中...')
 const startTime = ref(0)
+// 添加新的状态变量到这里
+const isUndoRedoRefreshing = ref(false)
 
 // 更新进度格式化函数
 const progressFormat = (percentage: number) => {
@@ -1452,12 +1676,19 @@ const updateProcessMetrics = () => {
       const remainingFiles = totalFiles.value - processedCount.value
       const remainingSeconds = remainingFiles / speed
       
-      if (remainingSeconds < 60) {
+      // 更精确的时间显示
+      if (remainingSeconds < 1) {
+        remainingTime.value = '不到1秒'
+      } else if (remainingSeconds < 60) {
         remainingTime.value = `${Math.ceil(remainingSeconds)}秒`
       } else if (remainingSeconds < 3600) {
-        remainingTime.value = `${Math.ceil(remainingSeconds / 60)}分钟`
+        const minutes = Math.floor(remainingSeconds / 60)
+        const seconds = Math.ceil(remainingSeconds % 60)
+        remainingTime.value = `${minutes}分${seconds}秒`
       } else {
-        remainingTime.value = `${(remainingSeconds / 3600).toFixed(1)}小时`
+        const hours = Math.floor(remainingSeconds / 3600)
+        const minutes = Math.floor((remainingSeconds % 3600) / 60)
+        remainingTime.value = `${hours}小时${minutes}分钟`
       }
     } else {
       remainingTime.value = '计算中...'
@@ -1470,82 +1701,68 @@ const CONFIG = {
   BATCH_SIZE: 200,    // 批处理数据大小
   VISIBLE_ITEMS: 30,  // 可视区域显示的行数
   BATCH_DELAY: 10,    // 批处理延迟时间(ms)
-  BUFFER_SIZE: 5,     // 缓冲区大小(额外渲染的行数)
+  BUFFER_SIZE: 10,     // 缓冲区大小(额外渲染的行数)
   ITEM_HEIGHT: 40     // 每行高度(px)
 } as const;
-
-// 创建 Worker 实例
-const worker = new Worker(
-  new URL('@/workers/renameWorker.ts', import.meta.url),
-  { type: 'module' }
-);
-
-// Worker 消息处理
-worker.onmessage = (e: MessageEvent) => {
-  const { type, payload } = e.data;
-  
-  switch (type) {
-    case 'renameResults':
-      handleRenameResults(payload);
-      break;
-    case 'validationResults':
-      handleValidationResults(payload);
-      break;
-    case 'conflictsResult':
-      handleConflictsResult(payload);
-      break;
-    case 'error':
-      handleWorkerError(payload);
-      break;
-  }
-};
-
-// 处理重命名结果
-const handleRenameResults = (results: any[]) => {
-  // 更新文件列表中的新文件名
-  filteredFileList.value = results;
-  // 触发UI更新
-  nextTick(() => {
-    updatePreview();
-  });
-};
-
-// 处理验证结果
-const handleValidationResults = (results: any[]) => {
-  const invalidFiles = results.filter(r => !r.isValid);
-  if (invalidFiles.length > 0) {
-    ElMessage.warning(`${invalidFiles.length} 个文件名无效`);
-  }
-};
-
-// 处理冲突检测结果
-const handleConflictsResult = (conflicts: any[]) => {
-  if (conflicts.length > 0) {
-    ElMessage.warning(`检测到 ${conflicts.length} 个文件名冲突`);
-    // 显示冲突文件列表
-    showConflictDialog(conflicts);
-  }
-};
-
-// 处理 Worker 错误
-const handleWorkerError = (error: any) => {
-  console.error('Worker error:', error);
-  ElMessage.error('处理失败：' + error.message);
-};
 
 // 添加进度相关的响应式变量
 const progressVisible = ref(false)
 const currentProgress = ref(0)
 const progressText = ref('')
 
+const rootDirHandle = ref<FileSystemDirectoryHandle | null>(null)
+
+// 定义 getDirectoryHandle 函数
+const getDirectoryHandle = async (path: string): Promise<FileSystemDirectoryHandle | null> => {
+  try {
+    if (!rootDirHandle.value) {
+      // 如果没有根目录句柄，重新请求
+      try {
+        rootDirHandle.value = await window.showDirectoryPicker({
+          mode: 'readwrite'
+        })
+      } catch (error) {
+        console.error('无法获取根目录句柄:', error)
+        ElMessage.error('请选择根目录')
+        return null
+      }
+    }
+
+    if (!path || path === rootDirHandle.value.name) {
+      return rootDirHandle.value
+    }
+
+    const relativePath = path.startsWith(rootDirHandle.value.name) 
+      ? path.slice(rootDirHandle.value.name.length + 1)
+      : path
+
+    const parts = relativePath.split('/').filter(Boolean)
+    let currentHandle = rootDirHandle.value
+
+    for (const part of parts) {
+      try {
+        currentHandle = await currentHandle.getDirectoryHandle(part)
+      } catch (error) {
+        console.error(`无法获取目录句柄: ${part} in ${path}`, error)
+        return null
+      }
+    }
+
+    return currentHandle
+  } catch (error) {
+    console.error(`获取目录句柄失败: ${path}`, error)
+    return null
+  }
+}
+
+// 修改 handleExecute 函数中保存 rootDirHandle 的部分
 const handleExecute = async () => {
   try {
-    // 初始化进度状态
+    // 初始化进度状态，但还不显示进度条
     isProcessing.value = true
     processProgress.value = 0
     processStatus.value = ''
     processedCount.value = 0
-    startTime.value = Date.now()
     
     const filesToRename = filteredFileList.value.filter(file => file.name !== file.newName)
     totalFiles.value = filesToRename.length
@@ -1553,151 +1770,290 @@ const handleExecute = async () => {
     // 检查是否有文件
     if (!filesToRename.length) {
       ElMessage.warning('没有可重命名的文件')
-      progressVisible.value = false
+      isProcessing.value = false // 重置处理状态
       return
     }
 
-    // 检查重名
-    const newNames = filesToRename.map(f => f.newName)
-    if (new Set(newNames).size !== newNames.length) {
-      ElMessage.error('重命名后存在重复的文件名')
-      progressVisible.value = false
-      return
-    }
-
-    // 请求用户选择目录
-    currentProgress.value = 10
-    progressText.value = '选择目录中...'
-    
-    const dirHandle = await window.showDirectoryPicker({
-      mode: 'readwrite'
-    })
-
-    // 检查目录中是否有源文件
-    currentProgress.value = 20
-    progressText.value = '检查源文件...'
-    
-    let hasSourceFiles = false
-    for (const file of filesToRename) {
-      try {
-        await dirHandle.getFileHandle(file.name)
-        hasSourceFiles = true
-        break
-      } catch (error) {
-        continue
+    try {
+      // 请求用户选择根目录并保存句柄
+      rootDirHandle.value = await window.showDirectoryPicker({
+        mode: 'readwrite'
+      })
+    } catch (error: unknown) {
+      if ((error as Error).name === 'AbortError') {
+        ElMessage.info('用户取消了执行')
+        isProcessing.value = false // 重置处理状态
+        return
       }
+      throw error
     }
 
-    if (!hasSourceFiles) {
-      ElMessage.error('选择的目录下没有找到需要重命名的文件，请确认目录是否正确')
-      progressVisible.value = false
-      return
-    }
+    // 只有在这里，确认用户选择了目录后才显示进度条
+    progressVisible.value = true
+    startTime.value = Date.now()
 
-    // 检查目标文件是否已存在
-    currentProgress.value = 30
-    progressText.value = '检查目标文件...'
-    
-    const existingFiles: string[] = []
-    for (const file of filesToRename) {
-      try {
-        await dirHandle.getFileHandle(file.newName)
-        existingFiles.push(file.newName)
-      } catch (error) {
-        // 文件不存在，可以继续
-        continue
-      }
-    }
-
-    if (existingFiles.length > 0) {
-      ElMessage.error(`以下文件已存在，为防止数据丢失，已停止重命名操作：\n${existingFiles.join('\n')}`)
-      progressVisible.value = false
-      return
-    }
-
-    // 执行重命名操作
+    // 开始定时更新进度信息
     const updateInterval = setInterval(() => {
       updateProcessMetrics()
     }, 1000)
 
-    const promises = filesToRename.map(async (file, index) => {
-      try {
-        progressText.value = `正在重命名: ${file.name} -> ${file.newName}`
-        
-        const fileHandle = await dirHandle.getFileHandle(file.name)
-        const fileContent = await fileHandle.getFile()
-        
-        // 创建新文件并写入内容
-        const newFileHandle = await dirHandle.getFileHandle(file.newName, { create: true })
-        const writable = await newFileHandle.createWritable()
-        await writable.write(await fileContent.arrayBuffer())
-        await writable.close()
-        
-        // 删除旧文件
-        await dirHandle.removeEntry(file.name)
+    // 获取所有子目录的句柄
+    const dirHandles = new Map<string, FileSystemDirectoryHandle>()
+    dirHandles.set('', rootDirHandle.value) // 根目录
 
-        // 更新进度
-        processedCount.value++
-        processProgress.value = Math.round((processedCount.value / totalFiles.value) * 100)
-        
-        return { success: true, file }
-      } catch (error) {
-        console.error('重命名失败:', error)
-        return { success: false, error }
+    // 辅助函数：将完整路径转换为相对路径
+    function getRelativePath(fullPath: string, rootDir: string): string {
+      // 如果路径等于根目录名，返回空字符串表示根目录
+      if (fullPath === rootDir) {
+        return ''
       }
-    })
+      // 如果完整路径以根目录名开头，去除根目录名部分
+      if (fullPath.startsWith(rootDir + '/')) {
+        return fullPath.substring(rootDir.length + 1)
+      }
+      return fullPath
+    }
 
-    const results = await Promise.all(promises)
-    clearInterval(updateInterval)
+    // 递归获取子目录句柄
+    async function getDirectoryHandle(path: string): Promise<FileSystemDirectoryHandle | null> {
+      try {
+        if (dirHandles.has(path)) {
+          return dirHandles.get(path)!
+        }
 
-    // 设置最终状态
-    processProgress.value = 100
-    processStatus.value = 'success'
-    
-    // 延迟关闭进度条
-    setTimeout(() => {
-      progressVisible.value = false
-    }, 500)
+        // 如果是空路径，直接返回根目录句柄
+        if (!path) {
+          dirHandles.set('', rootDirHandle.value!)  // 添加 ! 非空断言
+          return rootDirHandle.value!
+        }
 
-    if (results.every(r => r.success)) {
-      // 添加到历史记录
-      historyStore.addRecord(results.map(r => ({
-        oldName: r.file.name,
-        newName: r.file.newName
-      })))
-      
-      // 更新文件列表
-      const updatedFiles = fileStore.files.map(file => {
-        const renamedFile = results.find(r => r.file.name === file.name)
-        if (renamedFile?.file) {
-          return {
-            ...file,
-            name: renamedFile.file.newName
+        // 将路径转换为相对路径
+        const relativePath = getRelativePath(path, rootDirHandle.value!.name)
+        if (!relativePath) {
+          dirHandles.set(path, rootDirHandle.value!)
+          return rootDirHandle.value
+        }
+
+        const pathParts = relativePath.split('/').filter(part => part)
+        let currentHandle = rootDirHandle.value
+        
+        for (const part of pathParts) {
+          try {
+            currentHandle = await currentHandle!.getDirectoryHandle(part)
+          } catch (error) {
+            // console.log(`无法获取目录句柄: ${part} in ${path}`, error)
+            return null
           }
         }
-        return file
-      })
-      fileStore.$patch({ files: updatedFiles })
-      ElMessage.success(`成功重命名 ${results.length} 个文件`)
+        
+        dirHandles.set(path, currentHandle!)
+        return currentHandle
+      } catch (error) {
+        // console.log(`获取目录句柄失败: ${path}`, error)
+        return null
+      }
     }
 
-    if (results.some(r => !r.success)) {
-      const failedNames = results.filter(r => !r.success).map(r => r.file.name).join('\n')
-      ElMessage.error(`${results.length - results.filter(r => r.success).length} 个文件重命名失败:\n${failedNames}`)
+    // 检查每个目录是否存在，以及目录中是否有源文件
+    currentProgress.value = 20
+    progressText.value = '检查源文件...'
+    
+    const invalidPaths: string[] = []
+    const missingFiles: string[] = []
+    const validFiles: ProcessedFile[] = []
+
+    for (const file of filesToRename) {
+      try {
+        // 获取相对于根目录的路径
+        const relativePath = getRelativePath(file.path, rootDirHandle.value.name)
+        // console.log('处理文件:', {
+        //   originalPath: file.path,
+        //   relativePath: relativePath,
+        //   fileName: file.name,
+        //   rootDir: rootDirHandle.value.name
+        // })
+
+        const dirHandle = await getDirectoryHandle(file.path)
+        if (!dirHandle) {
+          invalidPaths.push(file.path)
+          continue
+        }
+
+        try {
+          const fileHandle = await dirHandle.getFileHandle(file.name)
+          // 确认文件确实存在后再添加到有效文件列表
+          await fileHandle.getFile() // 验证文件是否真实存在
+          validFiles.push({
+            ...file,
+            relativePath
+          })
+        } catch (error) {
+          // console.log(`文件不存在: ${file.path}/${file.name}`, error)
+          missingFiles.push(`${file.path}/${file.name}`)
+        }
+      } catch (error) {
+        // console.log(`处理文件失败: ${file.path}/${file.name}`, error)
+        missingFiles.push(`${file.path}/${file.name}`)
+      }
     }
 
-  } catch (error: unknown) {
-    progressVisible.value = false
-    if ((error as { name?: string }).name !== 'AbortError') {
+    if (invalidPaths.length > 0) {
+      const uniquePaths = [...new Set(invalidPaths)]
+      ElMessage.error(`以下目录不存在，请确认选择的根目录是否正确：\n${uniquePaths.join('\n')}`)
+      return
+    }
+
+    if (validFiles.length === 0) {
+      ElMessage.error('选择的目录下没有找到需要重命名的文件，请确认目录是否正确')
+      return
+    }
+
+    if (missingFiles.length > 0) {
+      const result = await ElMessageBox.confirm(
+        `以下文件未找到：\n${missingFiles.join('\n')}\n\n是否继续处理其他文件？`,
+        '警告',
+        {
+          confirmButtonText: '继续',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      ).catch(() => false)
+
+      if (!result) {
+        return
+      }
+    }
+
+    try {
+      const results = await Promise.allSettled(
+        validFiles.map(async (file) => {
+          try {
+            progressText.value = `正在重命名: ${file.path}/${file.name} -> ${file.newName}`
+            
+            const dirHandle = await getDirectoryHandle(file.path)
+            if (!dirHandle) {
+              throw new Error(`无法访问目录: ${file.path}`)
+            }
+
+            try {
+              // 使用 move 方法重命名文件
+              await (dirHandle as any).move(file.name, file.newName)
+
+              // 更新进度
+              processedCount.value++
+              processProgress.value = Math.round((processedCount.value / totalFiles.value) * 100)
+              
+              return { success: true, file }
+            } catch (moveError) {
+              // 如果 move 方法不可用，尝试使用替代方案
+              if ((moveError as Error).name === 'TypeError' || (moveError as Error).name === 'NotSupportedError') {
+                // 获取源文件
+                const sourceHandle = await dirHandle.getFileHandle(file.name)
+                const sourceFile = await sourceHandle.getFile()
+
+                // 创建新文件并写入内容
+                const targetHandle = await dirHandle.getFileHandle(file.newName!, { create: true })
+                const writable = await targetHandle.createWritable()
+                
+                try {
+                  // 复制文件内容
+                  await writable.write(await sourceFile.arrayBuffer())
+                  await writable.close()
+
+                  // 验证新文件是否创建成功
+                  const newFile = await targetHandle.getFile()
+                  if (newFile.size === sourceFile.size) {
+                    // 只有在新文件创建成功后才删除旧文件
+                    await dirHandle.removeEntry(file.name)
+                  } else {
+                    throw new Error('新文件大小与源文件不匹配')
+                  }
+                } catch (error) {
+                  // 如果过程中出现错误，清理新文件
+                  try {
+                    await writable.close()
+                    await dirHandle.removeEntry(file.newName!)
+                  } catch (cleanupError) {
+                    console.error('清理失败的新文件时出错', cleanupError)
+                  }
+                  throw error
+                }
+              } else {
+                throw moveError
+              }
+            }
+
+            // 更新进度
+            processedCount.value++
+            processProgress.value = Math.round((processedCount.value / totalFiles.value) * 100)
+            
+            return { success: true, file }
+          } catch (error) {
+            console.error(`重命名失败: ${file.path}/${file.name}`, error)
+            return { success: false, file, error }
+          }
+        })
+      )
+
+      clearInterval(updateInterval)
+
+      // 处理结果
+      const failures = results.filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected' || 
+          (result.status === 'fulfilled' && !result.value.success)
+      )
+
+      if (failures.length > 0) {
+        const failedFiles = failures.map(failure => {
+          if (failure.status === 'rejected') {
+            return failure.reason.file?.path + '/' + failure.reason.file?.name
+          } else {
+            // 处理 fulfilled 但失败的情况
+            const fulfilledFailure = failure as unknown as PromiseFulfilledResult<{success: false, file: ProcessedFile}>
+            return fulfilledFailure.value.file.path + '/' + fulfilledFailure.value.file.name
+          }
+        })
+        ElMessage.warning(`以下文件重命名失败：\n${failedFiles.join('\n')}`)
+      } else {
+        // 获取成功重命名的文件信息并添加到历史记录
+        const successfulFiles = results
+          .filter((result): result is PromiseFulfilledResult<{success: true, file: ProcessedFile}> => 
+            result.status === 'fulfilled' && result.value.success && result.value.file.newName !== undefined
+          )
+          .map(result => ({
+            oldName: result.value.file.name,
+            newName: result.value.file.newName!,
+            path: result.value.file.path
+          }))
+        // 添加到历史记录
+        historyStore.addNewOperation(successfulFiles)
+
+        // 更新文件列表中的文件名
+        fileStore.updateFiles(successfulFiles)
+        
+        ElMessage.success('重命名完成')
+      }
+
+      processStatus.value = failures.length > 0 ? 'exception' : 'success'
+    } catch (error) {
       console.error('重命名操作失败:', error)
-      ElMessage.error(`重命名操作失败: ${error}`)
+      ElMessage.error('重命名操作失败: ' + error)
+      processStatus.value = 'exception'
+    } finally {
+      clearInterval(updateInterval)
+      // 延迟关闭进度条，让用户能看到完成状态
+      setTimeout(() => {
+        isProcessing.value = false
+        progressVisible.value = false
+      }, 1500)
     }
-    processStatus.value = 'exception'
-  } finally {
-    // 延迟关闭进度显示
-    setTimeout(() => {
-      isProcessing.value = false
-    }, 1000)
+  } catch (error: unknown) {
+    console.error('执行失败:', error)
+    if ((error as Error).name !== 'AbortError') {
+      ElMessage.error('执行失败: ' + error)
+    }
+    isProcessing.value = false
+    progressVisible.value = false // 确保任何错误情况下都关闭进度条
   }
 }
 
@@ -1732,15 +2088,27 @@ const removeFilter = (index: number) => {
 
 // 修改 refreshFileList 函数
 function refreshFileList() {
+  // console.log('开始刷新文件列表')
+  // console.log('当前文件存储状态:', fileStore.files)
+  
   if (!fileStore.files?.length) {
     filteredFileList.value = []
     tableData.value = []
+    // console.log('文件列表为空，已清空表格')
+    return
+  }
+
+  // 如果正在进行撤销或重做操作的后续处理，保持当前的文件名
+  if (isUndoRedoRefreshing.value) {
+    // console.log('正在处理撤销/重做操作的后续处理，保持当前文件名')
     return
   }
 
   const processor = new RenameProcessor(processForm.value as RenameProcessForm)
   
   let files = [...fileStore.files]
+  // console.log('处理前的文件列表:', files)
+  
   if (activeFilters.value?.length) {
     files = files.filter(file => {
       return activeFilters.value.every(filter => {
@@ -1749,16 +2117,19 @@ function refreshFileList() {
         return filter.type === 'include' ? matchesFilter : !matchesFilter
       })
     })
+    // console.log('过滤后的文件列表:', files)
   }
 
   // 更新过滤后的文件列表
   filteredFileList.value = files.map((file, index) => ({
     ...file,
-    newName: processor.processFileName(file.name, index)
+    name: file.name, // 使用存储中的当前文件名
+    newName: processor.processFileName(file.name, index) // 基于当前文件名计算新文件名
   })) as ProcessedFile[]
 
   // 更新表格数据
-  tableData.value = filteredFileList.value
+  tableData.value = [...filteredFileList.value]
+  // console.log('更新后的表格数据:', tableData.value)
 }
 
 // 过滤器应用函数
@@ -1783,161 +2154,331 @@ function applyFilter(file: FileWithHandle, filter: FilterCondition): boolean {
   }
 }
 
-// 修改重做功能
-const handleRedo = async () => {
-  try {
-    const record = await historyStore.redo()
-    if (!record) {
-      ElMessage.warning('没有可重做的操作')
-      return
-    }
-
-    const dirHandle = await window.showDirectoryPicker({
-      mode: 'readwrite'
-    })
-
-    const promises = record.files.map(async (file) => {
-      try {
-        // 获取旧文件内容
-        const oldFileHandle = await dirHandle.getFileHandle(file.oldName)
-        const fileContent = await oldFileHandle.getFile()
-        
-        // 创建新文件名的文件
-        const newFileHandle = await dirHandle.getFileHandle(file.newName, { create: true })
-        const writable = await newFileHandle.createWritable()
-        await writable.write(await fileContent.arrayBuffer())
-        await writable.close()
-        
-        // 删除旧文件名的文件
-        await dirHandle.removeEntry(file.oldName)
-
-        return { success: true, file }
-      } catch (error) {
-        console.error('重做失败:', error)
-        return { success: false, error }
-      }
-    })
-
-    const results = await Promise.all(promises)
-    const succeeded = results.filter(r => r.success)
-    const failed = results.length - succeeded.length
-
-    if (succeeded.length > 0) {
-      // 更新文件列表
-      const updatedFiles = fileStore.files.map(file => {
-        const redoneFile = succeeded.find(r => r.file?.oldName === file.name)
-        if (redoneFile?.file) {
-          return {
-            ...file,
-            name: redoneFile.file.newName,
-            newName: redoneFile.file.newName
-          }
-        }
-        return file
-      })
-      fileStore.$patch({ files: updatedFiles })
-      ElMessage.success(`成功重做 ${succeeded.length} 个文件的重命名`)
-    }
-
-    if (failed > 0) {
-      ElMessage.error(`${failed} 个文件重做失败`)
-    }
-
-  } catch (error: unknown) {
-    if ((error as { name?: string }).name !== 'AbortError') {
-      console.error('重做操作失败:', error)
-      ElMessage.error('重做操作失败：' + error)
-    }
-  }
-}
-
 // 修改撤销功能
 const handleUndo = async () => {
   try {
-    const record = await historyStore.undo()
-    if (!record) {
+    const undoRecords = historyStore.getLastUndoRecord()
+    if (!undoRecords) {
       ElMessage.warning('没有可撤销的操作')
       return
     }
 
-    const dirHandle = await window.showDirectoryPicker({
-      mode: 'readwrite'
-    })
+    // 初始化进度
+    isProcessing.value = true
+    processProgress.value = 0
+    processStatus.value = ''
+    processedCount.value = 0
+    totalFiles.value = undoRecords.length
+    startTime.value = Date.now()
 
-    const promises = record.files.map(async (file) => {
+    // 如果没有根目录句柄，请求选择
+    if (!rootDirHandle.value) {
       try {
-        // 获取新文件内容
-        const newFileHandle = await dirHandle.getFileHandle(file.newName)
-        const fileContent = await newFileHandle.getFile()
-        
-        // 创建旧文件名的文件
-        const oldFileHandle = await dirHandle.getFileHandle(file.oldName, { create: true })
-        const writable = await oldFileHandle.createWritable()
-        await writable.write(await fileContent.arrayBuffer())
-        await writable.close()
-        
-        // 删除新文件名的文件
-        await dirHandle.removeEntry(file.newName)
-
-        return { success: true, file }
+        rootDirHandle.value = await window.showDirectoryPicker({
+          mode: 'readwrite'
+        })
       } catch (error) {
-        console.error('撤销失败:', error)
-        return { success: false, error }
+        console.error('选择目录失败:', error)
+        ElMessage.error('请选择根目录')
+        return
       }
-    })
+    }
 
-    const results = await Promise.all(promises)
-    const succeeded = results.filter(r => r.success)
-    const failed = results.length - succeeded.length
-
-    if (succeeded.length > 0) {
-      // 更新文件列表
-      const updatedFiles = fileStore.files.map(file => {
-        const undoneFile = succeeded.find(r => r.file?.newName === file.name)
-        if (undoneFile?.file) {
-          return {
-            ...file,
-            name: undoneFile.file.oldName,
-            newName: undoneFile.file.oldName
+    // 执行撤销操作
+    const results = await Promise.allSettled(
+      undoRecords.map(async (record) => {
+        try {
+          const dirHandle = await getDirectoryHandle(record.path)
+          if (!dirHandle) {
+            throw new Error(`无法访问目录: ${record.path}`)
           }
+
+          // 执行文件重命名
+          const oldFileHandle = await dirHandle.getFileHandle(record.oldName)
+          const oldFile = await oldFileHandle.getFile()
+          
+          // 创建新文件
+          const newFileHandle = await dirHandle.getFileHandle(record.newName, { create: true })
+          const writable = await newFileHandle.createWritable()
+          
+          // 复制内容
+          await writable.write(await oldFile.arrayBuffer())
+          await writable.close()
+          
+          // 删除旧文件
+          await dirHandle.removeEntry(record.oldName)
+
+          // 更新进度
+          processedCount.value++
+          processProgress.value = Math.round((processedCount.value / totalFiles.value) * 100)
+
+          return { success: true, record }
+        } catch (error) {
+          console.error(`撤销失败: ${record.path}/${record.oldName}`, error)
+          return { success: false, record, error }
         }
-        return file
       })
-      fileStore.$patch({ files: updatedFiles })
-      ElMessage.success(`成功撤销 ${succeeded.length} 个文件的重命名`)
+    )
+
+    // 处理结果
+    const failures = results.filter(
+      (result): result is PromiseRejectedResult => 
+        result.status === 'rejected' || 
+        (result.status === 'fulfilled' && !result.value.success)
+    )
+
+    if (failures.length === 0) {
+      isUndoRedoRefreshing.value = true
+      try {
+        // console.log('撤销操作前的文件状态:', fileStore.files)
+        // 更新文件列表，使用撤销记录中的新文件名，同时保留原有文件的所有属性
+        const successfulFiles = undoRecords.map(record => {
+          const originalFile = fileStore.files.find(f => 
+            f.path === record.path && (f.name === record.oldName || f.name === record.newName)
+          )
+          if (!originalFile) {
+            throw new Error(`找不到原始文件: ${record.path}/${record.oldName}`)
+          }
+          return {
+            ...originalFile, // 保留所有原始属性
+            name: record.newName, // 更新为新的文件名
+            newName: record.oldName // 确保 newName 也更新
+          }
+        })
+        
+        // 更新文件存储 - 使用类型安全的方式更新
+        // console.log('开始更新文件存储...')
+        // console.log('成功处理的文件:', successfulFiles)
+        fileStore.$patch(state => {
+          state.files = state.files.map(file => {
+            // console.log('处理文件:', file)
+            const updatedFile = successfulFiles.find(
+              f => f.path === file.path && (f.newName === file.name)
+            )
+            // console.log('找到的更新文件:', updatedFile)
+            const result = updatedFile || { ...file }
+            // console.log('最终结果:', result)
+            return result
+          })
+          // console.log('更新后的文件状态:', state.files)
+        })
+        // console.log('文件存储更新完成')
+        
+        // 确认撤销成功
+        historyStore.confirmUndo()
+        
+        // console.log('撤销后的文件状态:', fileStore.files)
+        
+        // 强制更新文件列表显示
+        filteredFileList.value = fileStore.files.map(file => ({
+          ...file,
+          name: file.name,
+          newName: file.name,
+          directory: file.path.split('/').slice(0, -1).join('/'),
+          isSelected: false,
+          relativePath: file.path
+        })) as ProcessedFile[]
+        
+        // 更新表格数据
+        tableData.value = [...filteredFileList.value]
+        // console.log('更新后的表格数据:', tableData.value)
+        ElMessage.success('撤销完成')
+      } finally {
+        // 确保在所有操作完成后重置标志
+        setTimeout(() => {
+          isUndoRedoRefreshing.value = false
+        }, 100)
+      }
+    } else {
+      const failedFiles = failures.map(failure => {
+        if (failure.status === 'rejected') {
+          return `${failure.reason.record.path}/${failure.reason.record.oldName}`
+        } else {
+          const fulfilledFailure = failure as unknown as PromiseFulfilledResult<{success: false, record: {path: string, oldName: string}}>
+          return `${fulfilledFailure.value.record.path}/${fulfilledFailure.value.record.oldName}`
+        }
+      })
+      ElMessage.warning(`以下文件撤销失败：\n${failedFiles.join('\n')}`)
     }
 
-    if (failed > 0) {
-      ElMessage.error(`${failed} 个文件撤销失败`)
-    }
-
-  } catch (error: unknown) {
-    if ((error as { name?: string }).name !== 'AbortError') {
-      console.error('撤销操作失败:', error)
-      ElMessage.error('撤销操作失败：' + error)
-    }
+    processStatus.value = failures.length > 0 ? 'exception' : 'success'
+  } catch (error) {
+    console.error('撤销操作失败:', error)
+    ElMessage.error('撤销操作失败: ' + error)
+    processStatus.value = 'exception'
+  } finally {
+    isProcessing.value = false
   }
 }
 
-// 修改行类名函数
-const getRowClassName = ({ row, rowIndex }: { row: ProcessedFile, rowIndex: number }) => {
-  const classes = []
-  
-  // 添加变更标记
-  if (row.name !== row.newName) {
-    classes.push('changed-row')
+// 修改重做功能
+const handleRedo = async () => {
+  try {
+    const redoRecords = historyStore.getLastRedoRecord()
+    if (!redoRecords) {
+      ElMessage.warning('没有可重做的操作')
+      return
+    }
+
+    // 初始化进度
+    isProcessing.value = true
+    processProgress.value = 0
+    processStatus.value = ''
+    processedCount.value = 0
+    totalFiles.value = redoRecords.length
+    startTime.value = Date.now()
+
+    // 如果没有根目录句柄，请求选择
+    if (!rootDirHandle.value) {
+      try {
+        rootDirHandle.value = await window.showDirectoryPicker({
+          mode: 'readwrite'
+        })
+      } catch (error) {
+        console.error('选择目录失败:', error)
+        ElMessage.error('请选择根目录')
+        return
+      }
+    }
+
+    // 执行重做操作
+    const results = await Promise.allSettled(
+      redoRecords.map(async (record) => {
+        try {
+          const dirHandle = await getDirectoryHandle(record.path)
+          if (!dirHandle) {
+            throw new Error(`无法访问目录: ${record.path}`)
+          }
+
+          // 执行文件重命名
+          const oldFileHandle = await dirHandle.getFileHandle(record.oldName)
+          const oldFile = await oldFileHandle.getFile()
+          
+          // 创建新文件
+          const newFileHandle = await dirHandle.getFileHandle(record.newName, { create: true })
+          const writable = await newFileHandle.createWritable()
+          
+          // 复制内容
+          await writable.write(await oldFile.arrayBuffer())
+          await writable.close()
+          
+          // 删除旧文件
+          await dirHandle.removeEntry(record.oldName)
+
+          // 更新进度
+          processedCount.value++
+          processProgress.value = Math.round((processedCount.value / totalFiles.value) * 100)
+
+          return { success: true, record }
+        } catch (error) {
+          console.error(`重做失败: ${record.path}/${record.oldName}`, error)
+          return { success: false, record, error }
+        }
+      })
+    )
+
+    // 处理结果
+    const failures = results.filter(
+      (result): result is PromiseRejectedResult => 
+        result.status === 'rejected' || 
+        (result.status === 'fulfilled' && !result.value.success)
+    )
+
+    if (failures.length === 0) {
+      isUndoRedoRefreshing.value = true
+      try {
+        // console.log('重做操作前的文件状态:', fileStore.files)
+        
+        // 更新文件列表，使用重做记录中的新文件名，同时保留原有文件的所有属性
+        const successfulFiles = redoRecords.map(record => {
+          const originalFile = fileStore.files.find(f => 
+            f.path === record.path && (f.name === record.oldName || f.name === record.newName)
+          )
+          if (!originalFile) {
+            throw new Error(`找不到原始文件: ${record.path}/${record.oldName}`)
+          }
+          return {
+            ...originalFile, // 保留所有原始属性
+            name: record.newName, // 更新为新的文件名
+            newName: record.oldName // 确保 newName 也更新
+          }
+        })
+        
+        // 更新文件存储 - 使用类型安全的方式更新
+        // console.log('开始更新文件存储...')
+        // console.log('成功处理的文件:', successfulFiles)
+        fileStore.$patch(state => {
+          state.files = state.files.map(file => {
+            // console.log('处理文件:', file)
+            const updatedFile = successfulFiles.find(
+              f => f.path === file.path && (f.newName === file.name)
+            )
+            // console.log('找到的更新文件:', updatedFile)
+            const result = updatedFile || { ...file }
+            // console.log('最终结果:', result)
+            return result
+          })
+          // console.log('更新后的文件状态:', state.files)
+        })
+        // console.log('文件存储更新完成')
+        
+        // 确认重做成功
+        historyStore.confirmRedo()
+        
+        // console.log('重做后的文件状态:', fileStore.files)
+        
+        // 强制更新文件列表显示
+        filteredFileList.value = fileStore.files.map(file => ({
+          ...file,
+          name: file.name,
+          newName: file.name,
+          directory: file.path.split('/').slice(0, -1).join('/'),
+          isSelected: false,
+          relativePath: file.path
+        })) as ProcessedFile[]
+        // 更新表格数据
+        tableData.value = [...filteredFileList.value]
+        // console.log('更新后的表格数据:', tableData.value)
+        ElMessage.success('重做完成')
+      } finally {
+        // 确保在所有操作完成后重置标志
+        setTimeout(() => {
+          isUndoRedoRefreshing.value = false
+        }, 100)
+      }
+    } else {
+
+      const failures = results.filter(
+      (result): result is PromiseFulfilledResult<{success: false, record: any}> => 
+        result.status === 'fulfilled' && !result.value.success
+      )
+
+      const failedFiles = failures.map(failure => 
+      `${failure.value.record.path}/${failure.value.record.oldName}`
+      )
+
+      ElMessage.warning(`以下文件重做失败：\n${failedFiles.join('\n')}`)
+    }
+
+    processStatus.value = failures.length > 0 ? 'exception' : 'success'
+  } catch (error) {
+    console.error('重做操作失败:', error)
+    ElMessage.error('重做操作失败: ' + error)
+    processStatus.value = 'exception'
+  } finally {
+    isProcessing.value = false
   }
-  
-  // 添加奇偶行标记
-  classes.push(rowIndex % 2 === 0 ? 'even-row' : 'odd-row')
-  
-  return classes.join(' ')
 }
 
 filteredFileList.value = fileStore.files.map(file => ({
   ...file,
-  newName: file.name // 初始时 newName 与原名相同
-}))
+  name: file.name,
+  newName: file.name,
+  directory: file.path.split('/').slice(0, -1).join('/'),
+  isSelected: false,
+  relativePath: file.path
+})) as ProcessedFile[]
+        
 
 // 添加控制 popover 显示的变量
 const helpVisible = ref(false)
@@ -1982,27 +2523,6 @@ declare global {
   }
 }
 
-// 处理文件名的函数
-const processFileName = (file: FileWithHandle): string => {
-  let newName = file.name
-
-  // 处理正则替换
-  if (processForm.regex.enabled) {
-    newName = processRegexRename(
-      newName,
-      processForm.regex.pattern,
-      processForm.regex.replacement,
-      {
-        processExt: processForm.regex.processExt,
-        useGlobal: processForm.regex.useGlobal,
-        ignoreCase: processForm.regex.ignoreCase
-      }
-    )
-  }
-
-  return newName
-}
-
 const regexHelpVisible = ref(false)
 
 const showRegexHelp = () => {
@@ -2016,8 +2536,11 @@ const sortConfig = ref({
 })
 
 // 处理排序变化
-const handleSortChange = ({ prop, order }: { prop: string; order: 'ascending' | 'descending' | null }) => {
-  sortConfig.value = { prop, order }
+const handleSortChange = (config: { prop: string; order: 'ascending' | 'descending' | null }) => {
+  sortConfig.value = {
+    prop: config.prop,
+    order: config.order
+  }
 }
 
 // 文件元数据接口
@@ -2035,15 +2558,14 @@ interface FileMeta {
 const fileMap = new Map<string, FileMeta>();
 
 // 优化的文件加载函数
-const loadDirectoryContent = async (dirHandle: FileSystemDirectoryHandle, parentPath = '') => {
-  const entries = [];
+const loadDirectoryContent = async (dirHandle: FileSystemDirectoryHandle, parentPath = ''): Promise<FileMeta[]> => {
+  const entries: FileMeta[] = [];
   try {
     for await (const entry of dirHandle.values()) {
       if (entry.kind === 'file') {
         const path = parentPath ? `${parentPath}/${entry.name}` : entry.name;
-        // 只存储必要的元数据
         const fileMeta: FileMeta = {
-          handle: entry,
+          handle: entry as FileSystemFileHandle,
           originalName: entry.name,
           status: 'pending',
           path: path
@@ -2052,8 +2574,7 @@ const loadDirectoryContent = async (dirHandle: FileSystemDirectoryHandle, parent
         entries.push(fileMeta);
       } else if (entry.kind === 'directory') {
         const newPath = parentPath ? `${parentPath}/${entry.name}` : entry.name;
-        // 递归处理子目录
-        const subEntries = await loadDirectoryContent(entry, newPath);
+        const subEntries = await loadDirectoryContent(entry as FileSystemDirectoryHandle, newPath);
         entries.push(...subEntries);
       }
     }
@@ -2064,37 +2585,19 @@ const loadDirectoryContent = async (dirHandle: FileSystemDirectoryHandle, parent
   return entries;
 };
 
-// 组件卸载时清理 Worker
-onUnmounted(() => {
-  worker.terminate();
-});
-
-// 处理文件选择
-const handleFilesSelected = async (files: File[]) => {
-  // 处理文件上传
-  await fileStore.addFiles(files)
-  // 确保表格数据更新
-  tableData.value = [...fileStore.files]
-}
-
-// 定义重命名规则
-const currentRules = ref([
-  {
-    type: 'replace',
-    find: '',
-    replace: '',
-    useRegex: false,
-    caseSensitive: false
-  }
-])
-
 const virtualListRef = ref() // 添加对VirtualFileList组件的引用
-
 // 处理全选
 const handleSelectAll = () => {
   if (virtualListRef.value) {
     virtualListRef.value.selectAll()
   }
+}
+
+// 添加对话框控制变量
+const jsHelpVisible = ref(false)
+// 添加显示帮助的方法
+const showJsHelp = () => {
+  jsHelpVisible.value = true
 }
 </script>
 
@@ -2800,5 +3303,196 @@ code {
   color: #606266;
   font-size: 14px;
   word-break: break-all;
+}
+
+/* 帮助对话框样式 */
+.js-help-dialog {
+  :deep(.el-dialog__body) {
+    padding: 0;
+  }
+}
+
+.help-page {
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.page-title {
+  text-align: center;
+  margin-bottom: 30px;
+  color: var(--el-color-primary);
+  font-size: 24px;
+}
+
+.intro-content, .example-section, .ai-guide {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.feature-card, .example-card {
+  background: var(--el-bg-color-overlay);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.code-block {
+  background: var(--el-bg-color-page);
+  border-radius: 4px;
+  padding: 15px;
+  margin: 10px 0;
+  font-family: monospace;
+  white-space: pre-wrap;
+  color: var(--el-text-color-primary);
+}
+
+.example-result {
+  margin-top: 15px;
+  padding: 10px;
+  background: var(--el-bg-color);
+  border-radius: 4px;
+}
+
+.example-result p {
+  margin: 5px 0;
+  color: var(--el-text-color-secondary);
+}
+
+.prompt-template, .prompt-example {
+  background: var(--el-bg-color-overlay);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.example-content {
+  margin-top: 15px;
+}
+
+.example-content ol {
+  padding-left: 20px;
+}
+
+.example-content li {
+  margin: 5px 0;
+  color: var(--el-text-color-secondary);
+}
+
+/* 轮播图指示器样式 */
+:deep(.el-carousel__indicators) {
+  transform: translateY(16px);
+}
+
+:deep(.el-carousel__indicator) {
+  padding: 12px 4px;
+}
+
+:deep(.el-carousel__button) {
+  width: 30px;
+  height: 3px;
+  background-color: var(--el-color-primary);
+  opacity: 0.24;
+}
+
+:deep(.el-carousel__indicator.is-active button) {
+  opacity: 1;
+}
+
+/* 添加新的样式 */
+.intro-content {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: min-content;
+}
+
+.feature-card {
+  background: var(--el-bg-color-overlay);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+
+.feature-list li {
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.params-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+}
+
+.params-table th,
+.params-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.params-table th {
+  background-color: var(--el-bg-color);
+  font-weight: bold;
+}
+
+.params-table code {
+  background-color: var(--el-bg-color);
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--el-color-primary);
+}
+
+.tips-content,
+.security-content {
+  margin-top: 10px;
+}
+
+.tip-item {
+  margin-bottom: 15px;
+}
+
+.tip-item h5 {
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tip-item ul,
+.security-content ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.tip-item li,
+.security-content li {
+  margin: 5px 0;
+  color: var(--el-text-color-secondary);
+}
+
+.security-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--el-color-warning);
+  margin-bottom: 10px;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .intro-content {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

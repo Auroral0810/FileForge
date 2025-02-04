@@ -1,43 +1,63 @@
 import { defineStore } from 'pinia'
 // import type { FileWithHandle } from './fileStore'
 
-interface HistoryRecord {
-  files: Array<{
-    oldName: string
-    newName: string
-  }>
-  timestamp: number
+interface RenameRecord {
+  oldName: string
+  newName: string
+  path: string
 }
 
-export const useHistoryStore = defineStore('history', {
+// 确保 store 名称唯一
+export const useHistoryStore = defineStore('historyStore', {
   state: () => ({
-    undoStack: [] as HistoryRecord[],
-    redoStack: [] as HistoryRecord[]
+    undoStack: [] as RenameRecord[][],
+    redoStack: [] as RenameRecord[][]
   }),
 
   actions: {
-    addRecord(files: Array<{ oldName: string, newName: string }>) {
-      this.undoStack.push({
-        files,
-        timestamp: Date.now()
-      })
-      this.redoStack = [] // 清空重做栈
+    // 清空历史记录并添加新的操作
+    addNewOperation(records: RenameRecord[]) {
+      // 清空重做栈
+      this.redoStack = []
+      // 添加新操作到撤销栈
+      this.undoStack.push(records)
     },
 
-    async undo() {
+    // 获取最近的撤销记录
+    getLastUndoRecord(): RenameRecord[] | null {
       if (this.undoStack.length === 0) return null
-      const record = this.undoStack.pop()!
-      this.redoStack.push(record)
-      return record
+      const records = this.undoStack[this.undoStack.length - 1]
+      return records.map(record => ({
+        oldName: record.newName, // 交换新旧文件名
+        newName: record.oldName,
+        path: record.path
+      }))
     },
 
-    async redo() {
+    // 获取最近的重做记录
+    getLastRedoRecord(): RenameRecord[] | null {
       if (this.redoStack.length === 0) return null
-      const record = this.redoStack.pop()!
-      this.undoStack.push(record)
-      return record
+      const records = this.redoStack[this.redoStack.length - 1]
+      return records
     },
 
+    // 确认撤销操作完成
+    confirmUndo() {
+      if (this.undoStack.length > 0) {
+        const records = this.undoStack.pop()!
+        this.redoStack.push(records)
+      }
+    },
+
+    // 确认重做操作完成
+    confirmRedo() {
+      if (this.redoStack.length > 0) {
+        const records = this.redoStack.pop()!
+        this.undoStack.push(records)
+      }
+    },
+
+    // 清空所有历史记录
     clear() {
       this.undoStack = []
       this.redoStack = []

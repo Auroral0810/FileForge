@@ -11,15 +11,10 @@ export interface FileWithHandle {
   stream: () => ReadableStream
   text: () => Promise<string>
 }
-
-export interface ProcessedFile {
-  name: string
-  newName: string
-  path: string
+export interface ProcessedFile extends FileWithHandle {
   directory: string
-  size: number
-  lastModified: number
-  type: string
+  isSelected?: boolean  
+  relativePath: string
 }
 
 export interface FilterCondition {
